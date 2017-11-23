@@ -95,7 +95,8 @@ public abstract class FeedForwardNeuralNetworkBase<C extends FeedForwardNeuralNe
         costAndGradients = getCostAndGradients(trainingDataActivations, 
             trainingLabelActivations, trainingContext);
         
-        boolean checkGradients = true;
+        // Disable gradient checking
+        boolean checkGradients = false;
         
         if (checkGradients) {
           GradientChecker checker = createGradientChecker(i);

@@ -39,11 +39,10 @@ import java.util.List;
  */
 public class GradientChecker {
 
-  private static final Logger LOGGER = 
-      LoggerFactory.getLogger(FeedForwardNeuralNetworkBase.class);
-  
+  private static final Logger LOGGER = LoggerFactory.getLogger(FeedForwardNeuralNetworkBase.class);
+
   private SupervisedFeedForwardNeuralNetworkImpl feedForwardNeuralNetwork;
-  
+
   /**
    * Contract a gradient checker for this neural network.
    * 
@@ -82,7 +81,7 @@ public class GradientChecker {
   }
 
   /**
-   * Performs numerical gradient checks...outputting a metric which represents the difference 
+   * Performs numerical gradient checks...outputting a metric which represents the difference
    * between the numerical gradients and the gradient from back prop.
    * 
    * @param inputActivations The input activations.
@@ -95,24 +94,24 @@ public class GradientChecker {
       CostAndGradients costAndGradients) {
 
     LOGGER.info("Performing gradient check.....");
-    
+
     List<Matrix> averageAxonsGradients = costAndGradients.getAverageTrainableAxonsGradients();
 
     List<TrainableAxons<?, ?, ?>> axonsList = getTrainableAxonsList(feedForwardNeuralNetwork);
 
-    SupervisedFeedForwardNeuralNetworkImpl firstDup = 
-        (SupervisedFeedForwardNeuralNetworkImpl)feedForwardNeuralNetwork.dup();
+    SupervisedFeedForwardNeuralNetworkImpl firstDup =
+        (SupervisedFeedForwardNeuralNetworkImpl) feedForwardNeuralNetwork.dup();
 
-    SupervisedFeedForwardNeuralNetworkImpl secondDup = 
-        (SupervisedFeedForwardNeuralNetworkImpl)feedForwardNeuralNetwork.dup();
+    SupervisedFeedForwardNeuralNetworkImpl secondDup =
+        (SupervisedFeedForwardNeuralNetworkImpl) feedForwardNeuralNetwork.dup();
 
     List<Double> dthetaList = new ArrayList<Double>();
     List<Double> dthetaApproxList = new ArrayList<Double>();
     List<Double> diffList = new ArrayList<Double>();
-    
+
     for (int axonsIndex = 0; axonsIndex < averageAxonsGradients.size(); axonsIndex++) {
 
-      
+
 
       Axons<?, ?, ?> axons = axonsList.get(axonsIndex);
 
@@ -122,58 +121,55 @@ public class GradientChecker {
 
       Matrix axonsConnectionWeights = axons.getConnectionWeights();
 
-      if (true) {
+      double epsilon = Math.pow(10, -7);
 
-        double epsilon = Math.pow(10, -7);
+      // Create two clones of these Axon weights -
+      // we will perturb the weight each of the weights in each clone in turn.
+      Axons<?, ?, ?> axonsClone1 = getTrainableAxonsList(firstDup).get(axonsIndex);
+      Axons<?, ?, ?> axonsClone2 = getTrainableAxonsList(secondDup).get(axonsIndex);
 
-        // Create two clones of these Axon weights - 
-        // we will perturb the weight each of the weights in each clone in turn.
-        Axons<?, ?, ?> axonsClone1 = getTrainableAxonsList(firstDup).get(axonsIndex);
-        Axons<?, ?, ?> axonsClone2 = getTrainableAxonsList(secondDup).get(axonsIndex);
+      // Loop through all the weights in these Axons.
+      for (int row = 0; row < axonsConnectionWeights.getRows(); row++) {
+        for (int col = 0; col < axonsConnectionWeights.getColumns(); col++) {
 
-        // Loop through all the weights in these Axons.
-        for (int row = 0; row < axonsConnectionWeights.getRows(); row++) {
-          for (int col = 0; col < axonsConnectionWeights.getColumns(); col++) {
+          // Adjust the value of this weight by subtracting epsilon in the clone1Weights.
+          Matrix clone1Weights = axonsClone1.getConnectionWeights();
+          double dtheta = axonsGrad.get(row, col);
+          dthetaList.add(dtheta);
+          double originalFirstWeightValue = clone1Weights.get(row, col);
+          clone1Weights.put(row, col, originalFirstWeightValue - epsilon);
 
-            // Adjust the value of this weight by subtracting epsilon in the clone1Weights.
-            Matrix clone1Weights = axonsClone1.getConnectionWeights();
-            double dtheta = axonsGrad.get(row, col);
-            dthetaList.add(dtheta);
-            double originalFirstWeightValue = clone1Weights.get(row, col);
-            clone1Weights.put(row, col, originalFirstWeightValue - epsilon);
+          // Adjust the value of this weight by adding epsilon in the clone2Weights.
+          Matrix clone2Weights = axonsClone2.getConnectionWeights();
+          double originalSecondWeightValue = clone2Weights.get(row, col);
+          clone2Weights.put(row, col, originalSecondWeightValue + epsilon);
 
-            // Adjust the value of this weight by adding epsilon in the clone2Weights.
-            Matrix clone2Weights = axonsClone2.getConnectionWeights();
-            double originalSecondWeightValue = clone2Weights.get(row, col);
-            clone2Weights.put(row, col, originalSecondWeightValue + epsilon);
+          // Get the cost of the clone 1 weights.
+          double clone1Cost =
+              firstDup.getAverageCost(inputActivations, desiredOutputActivations, trainingContext);
 
-            // Get the cost of the clone 1 weights.
-            double clone1Cost = firstDup.getAverageCost(inputActivations,
-                desiredOutputActivations, trainingContext);
+          // Get the cost of the clone 2 weights.
+          double clone2Cost =
+              secondDup.getAverageCost(inputActivations, desiredOutputActivations, trainingContext);
 
-            // Get the cost of the clone 2 weights.
-            double clone2Cost = secondDup.getAverageCost(inputActivations,
-                desiredOutputActivations, trainingContext);
+          // Approximate the gradient of the weight in each of the clones using
+          // the costs for the perturbed weight clones.
+          double dthetaApprox = clone2Cost - clone1Cost;
+          dthetaApprox = dthetaApprox / (2d * epsilon);
+          LOGGER.trace("Numerical gradient:" + dthetaApprox);
+          LOGGER.trace("Back prop gradient:" + dtheta);
 
-            // Approximate the gradient of the weight in each of the clones using 
-            // the costs for the perturbed weight clones.
-            double dthetaApprox = clone2Cost - clone1Cost;
-            dthetaApprox = dthetaApprox / (2d * epsilon);
-            LOGGER.trace("Numerical gradient:" + dthetaApprox);
-            LOGGER.trace("Back prop gradient:" + dtheta);
+          dthetaApproxList.add(dthetaApprox);
+          double diff = dthetaApprox - dtheta;
 
-            dthetaApproxList.add(dthetaApprox);
-            double diff = dthetaApprox - dtheta;
+          diffList.add(diff);
+          LOGGER.trace(axonsIndex + "," + row + "," + col + "," + diff);
+          // Reset the values of the weights.
+          clone1Weights.put(row, col, originalFirstWeightValue);
 
-            diffList.add(diff);
-            System.out.println(axonsIndex + "," + row + "," + col + "," + diff);
-
-            // Reset the values of the weights.
-            clone1Weights.put(row, col, originalFirstWeightValue);
-
-            clone2Weights.put(row, col, originalSecondWeightValue);
-          }
+          clone2Weights.put(row, col, originalSecondWeightValue);
         }
+
 
         double top = norm(diffList);
         double bottom = norm(dthetaApproxList) + norm(dthetaList);
