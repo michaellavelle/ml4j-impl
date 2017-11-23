@@ -127,6 +127,6 @@ public class SupervisedFeedForwardNeuralNetworkImpl
 
   @Override
   protected GradientChecker createGradientChecker(int epochNumber) {
-    return new GradientChecker(this);
+    return epochNumber == 0 ? null : new GradientChecker(this);
   }
 }

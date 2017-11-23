@@ -106,11 +106,13 @@ public class GradientChecker {
     SupervisedFeedForwardNeuralNetworkImpl secondDup = 
         (SupervisedFeedForwardNeuralNetworkImpl)feedForwardNeuralNetwork.dup();
 
+    List<Double> dthetaList = new ArrayList<Double>();
+    List<Double> dthetaApproxList = new ArrayList<Double>();
+    List<Double> diffList = new ArrayList<Double>();
+    
     for (int axonsIndex = 0; axonsIndex < averageAxonsGradients.size(); axonsIndex++) {
 
-      List<Double> dthetaList = new ArrayList<Double>();
-      List<Double> dthetaApproxList = new ArrayList<Double>();
-      List<Double> diffList = new ArrayList<Double>();
+      
 
       Axons<?, ?, ?> axons = axonsList.get(axonsIndex);
 
