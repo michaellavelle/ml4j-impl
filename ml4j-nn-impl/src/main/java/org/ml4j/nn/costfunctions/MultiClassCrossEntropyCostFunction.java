@@ -48,6 +48,6 @@ public class MultiClassCrossEntropyCostFunction implements CostFunction {
 
   @Override
   public double getAverageCost(Matrix desiredOutputs, Matrix actualOutputs) {
-    return getAverageCost(desiredOutputs, actualOutputs);
+    return getTotalCost(desiredOutputs, actualOutputs) / desiredOutputs.getRows();
   }
 }

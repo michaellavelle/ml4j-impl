@@ -22,6 +22,10 @@ import org.ml4j.nn.FeedForwardNeuralNetworkContext;
 import org.ml4j.nn.ForwardPropagation;
 import org.ml4j.nn.layers.FeedForwardLayer;
 import org.ml4j.nn.neurons.NeuronsActivation;
+import org.ml4j.nn.util.GradientChecker;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Default implementation of SupervisedFeedForwardNeuralNetwork.
@@ -99,12 +103,30 @@ public class SupervisedFeedForwardNeuralNetworkImpl
 
   @Override
   public SupervisedFeedForwardNeuralNetwork dup() {
-    return new SupervisedFeedForwardNeuralNetworkImpl(getLayer(0), getLayer(1));
+    
+    List<FeedForwardLayer<?, ?>> duplicatedLayers = new ArrayList<>();
+    for (FeedForwardLayer<?, ?> layer : getLayers()) {
+      duplicatedLayers.add(layer.dup());
+    }
+    
+    return new SupervisedFeedForwardNeuralNetworkImpl(duplicatedLayers.toArray(
+        new FeedForwardLayer[getNumberOfLayers()]));
   }
   
   @Override
   public CostAndGradients getCostAndGradients(NeuronsActivation inputActivations,
       NeuronsActivation desiredOutpuActivations, FeedForwardNeuralNetworkContext trainingContext) {
     return super.getCostAndGradients(inputActivations, desiredOutpuActivations, trainingContext);
+  }
+
+  @Override
+  public double getAverageCost(NeuronsActivation inputActivations,
+      NeuronsActivation desiredOutputActivations, FeedForwardNeuralNetworkContext trainingContext) {
+    return super.getAverageCost(inputActivations, desiredOutputActivations, trainingContext);
+  }
+
+  @Override
+  protected GradientChecker createGradientChecker(int epochNumber) {
+    return new GradientChecker(this);
   }
 }

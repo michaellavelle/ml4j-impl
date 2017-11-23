@@ -396,8 +396,15 @@ public abstract class AxonsBase<L extends Neurons,
   
   @Override
   public Matrix getDetachedConnectionWeights() {
-    LOGGER.debug("Duplicating connetion weights");
+    LOGGER.debug("Duplicating connection weights");
     return connectionWeights.dup();
+  }
+  
+  
+  @Override
+  public Matrix getConnectionWeights() {
+    LOGGER.debug("Obtaining connection weights");
+    return connectionWeights;
   }
   
   protected void adjustConnectionWeights(Matrix adjustment,

@@ -34,6 +34,7 @@ import org.ml4j.nn.neurons.NeuronsActivation;
 import org.ml4j.nn.neurons.NeuronsActivationFeatureOrientation;
 import org.ml4j.nn.synapses.DirectedSynapses;
 import org.ml4j.nn.synapses.DirectedSynapsesGradient;
+import org.ml4j.nn.util.GradientChecker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -94,6 +95,16 @@ public abstract class FeedForwardNeuralNetworkBase<C extends FeedForwardNeuralNe
         costAndGradients = getCostAndGradients(trainingDataActivations, 
             trainingLabelActivations, trainingContext);
         
+        boolean checkGradients = true;
+        
+        if (checkGradients) {
+          GradientChecker checker = createGradientChecker(i);
+          if (checker != null) {
+            checker.checkGradients(trainingDataActivations, trainingLabelActivations,
+                trainingContext, costAndGradients);
+          }
+        }
+        
         LOGGER.info("Epoch:" + i + " Cost:" + costAndGradients.getAverageCost());
         
         adjustConnectionWeights(trainingContext, 
@@ -141,7 +152,48 @@ public abstract class FeedForwardNeuralNetworkBase<C extends FeedForwardNeuralNe
    
     }
   }
+  
+  /**
+   * Calculates the average cost from the cost function given the inputs and desired outputs.
+   * 
+   * @param inputActivations The inputs.
+   * @param desiredOutputActivations The desired outputs.
+   * @param trainingContext The training context.
+   * @return The average cost.
+   */
+  protected double getAverageCost(NeuronsActivation inputActivations,
+      NeuronsActivation desiredOutputActivations, C trainingContext) {
+    
+    final CostFunction costFunction = getCostFunction(trainingContext.getMatrixFactory());
+
+    // Forward propagate the trainingDataActivations through the entire AutoEncoder
+    ForwardPropagation forwardPropagation =
+        forwardPropagate(inputActivations, trainingContext);
+    
+    // Obtain the cost from the cost function
+    LOGGER.debug("Calculating average cost function cost");
+    double totalCost = costFunction.getAverageCost(desiredOutputActivations.getActivations(),
+        forwardPropagation.getOutputs().getActivations());
+    
+    double totalRegularisationCost = forwardPropagation
+        .getAverageRegularisationCost(trainingContext);
+        
+    double totalCostWithRegularisation = totalCost + totalRegularisationCost;
+    
+    return totalCostWithRegularisation;
+  }
+  
  
+  /**
+   * Gives subclasses an opportunity to check gradients at a specified epoch number.
+   * 
+   * @param epochNumber The epoch number.
+   * @return An optional gradient checker to run given the specified epoch number.
+   */
+  protected GradientChecker createGradientChecker(int epochNumber) {
+    return null;
+  }
+
   protected CostAndGradients getCostAndGradients(NeuronsActivation inputActivations,
       NeuronsActivation desiredOutputActivations, C trainingContext) {
    

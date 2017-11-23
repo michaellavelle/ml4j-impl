@@ -243,4 +243,9 @@ public class ZeroPaddedConvolutionalAxonsImpl
   public int getZeroPadding() {
     return zeroPadding;
   }
+
+  @Override
+  public Matrix getConnectionWeights() {
+    return unpaddedConvolutionalAxonsImpl.getConnectionWeights();
+  }
 }

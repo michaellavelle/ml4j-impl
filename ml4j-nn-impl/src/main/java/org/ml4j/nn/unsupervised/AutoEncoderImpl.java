@@ -21,6 +21,9 @@ import org.ml4j.nn.neurons.NeuronsActivation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * Default implementation of AutoEncoder consisting of FeedForwardLayers.
  *
@@ -58,7 +61,13 @@ public class AutoEncoderImpl extends
 
   @Override
   public AutoEncoder dup() {
-    return new AutoEncoderImpl(getLayer(0), getLayer(1));
+    List<FeedForwardLayer<?, ?>> duplicatedLayers = new ArrayList<>();
+    for (FeedForwardLayer<?, ?> layer : getLayers()) {
+      duplicatedLayers.add(layer.dup());
+    }
+    
+    return new AutoEncoderImpl(duplicatedLayers.toArray(
+        new FeedForwardLayer[getNumberOfLayers()]));
   }
 
   @Override
