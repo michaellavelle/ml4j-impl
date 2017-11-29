@@ -8,6 +8,7 @@ import org.ml4j.nn.axons.AxonsActivation;
 import org.ml4j.nn.axons.ScaleAndShiftAxons;
 import org.ml4j.nn.neurons.Neurons;
 import org.ml4j.nn.neurons.NeuronsActivation;
+import org.ml4j.nn.neurons.NeuronsActivationWithPossibleBiasUnit;
 
 /**
  * Default implementation of batch-norm DirectedSynapses
@@ -54,8 +55,13 @@ public class BatchNormDirectedSynapsesImpl<L extends Neurons, R extends Neurons>
       throw new IllegalStateException("Batch Norm Synapses can't be the outer synapses");
     }
 
-    NeuronsActivation xhatn =
-        synapsesActivation.getAxonsActivation().getInput().withBiasUnit(false, context);
+    NeuronsActivationWithPossibleBiasUnit xhatn1 =
+        synapsesActivation.getAxonsActivation().getPostDropoutInputWithPossibleBias()
+        .withBiasUnit(false, context);
+    
+    NeuronsActivation xhatn = new NeuronsActivation(xhatn1.getActivations(), 
+        xhatn1.getFeatureOrientation());
+    
     Matrix xhat = xhatn.getActivations();
     Matrix dout = outerGradient.getActivations().transpose();
 
@@ -108,12 +114,10 @@ public class BatchNormDirectedSynapsesImpl<L extends Neurons, R extends Neurons>
 
     NeuronsActivation input = synapsesActivation.getInput();
 
-    NeuronsActivation inputWithoutBias = input.withBiasUnit(false, context);
-
-    Matrix meanMatrix = getMeanMatrix(inputWithoutBias, context.getMatrixFactory());
+    Matrix meanMatrix = getMeanMatrix(input, context.getMatrixFactory());
 
     Matrix varianceMatrix =
-        getVarianceMatrix(inputWithoutBias, context.getMatrixFactory(), meanMatrix);
+        getVarianceMatrix(input, context.getMatrixFactory(), meanMatrix);
 
     Matrix istd = context.getMatrixFactory().createMatrix(varianceMatrix.getRows(),
         varianceMatrix.getColumns());
@@ -134,7 +138,7 @@ public class BatchNormDirectedSynapsesImpl<L extends Neurons, R extends Neurons>
     Matrix dx = gamma.mul(istd).div(num).mul(dout.mul(num).sub(xhat.mul(dgammab)).sub(dbetab));
 
     NeuronsActivation dxn =
-        new NeuronsActivation(dx.transpose(), false, outerGradient.getFeatureOrientation());
+        new NeuronsActivation(dx.transpose(), outerGradient.getFeatureOrientation());
 
     Matrix axonsGradient = context.getMatrixFactory().createMatrix(2, dgamma.getColumns());
     axonsGradient.putRow(0, dgamma);
@@ -150,17 +154,15 @@ public class BatchNormDirectedSynapsesImpl<L extends Neurons, R extends Neurons>
 
     NeuronsActivation input = synapsesInput.getInput();
 
-    NeuronsActivation inputWithoutBias = input.withBiasUnit(false, context);
-
-    Matrix meanMatrix = getMeanMatrix(inputWithoutBias, context.getMatrixFactory());
+    Matrix meanMatrix = getMeanMatrix(input, context.getMatrixFactory());
 
     Matrix varianceMatrix =
-        getVarianceMatrix(inputWithoutBias, context.getMatrixFactory(), meanMatrix);
+        getVarianceMatrix(input, context.getMatrixFactory(), meanMatrix);
 
-    Matrix xhat = divi(inputWithoutBias.getActivations().sub(meanMatrix), varianceMatrix);
+    Matrix xhat = divi(input.getActivations().sub(meanMatrix), varianceMatrix);
 
     NeuronsActivation xhatN =
-        new NeuronsActivation(xhat, false, synapsesInput.getInput().getFeatureOrientation());
+        new NeuronsActivation(xhat, synapsesInput.getInput().getFeatureOrientation());
 
     // y = gamma * xhat + beta
     AxonsActivation axonsActivation =
@@ -201,10 +203,6 @@ public class BatchNormDirectedSynapsesImpl<L extends Neurons, R extends Neurons>
   private Matrix getVarianceMatrix(NeuronsActivation input, MatrixFactory matrixFactory,
       Matrix meanRowVector) {
 
-    if (input.isBiasUnitIncluded()) {
-      throw new UnsupportedOperationException("Only input without bias supported");
-    }
-
     Matrix varianceMatrix = matrixFactory.createMatrix(input.getActivations().getRows(),
         input.getActivations().getColumns());
     for (int r = 0; r < varianceMatrix.getRows(); r++) {
@@ -225,10 +223,6 @@ public class BatchNormDirectedSynapsesImpl<L extends Neurons, R extends Neurons>
   }
 
   private Matrix getMeanMatrix(NeuronsActivation input, MatrixFactory matrixFactory) {
-
-    if (input.isBiasUnitIncluded()) {
-      throw new UnsupportedOperationException("Only input without bias supported");
-    }
 
     Matrix meanMatrix = matrixFactory.createMatrix(input.getActivations().getRows(),
         input.getActivations().getColumns());
