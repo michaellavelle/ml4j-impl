@@ -159,7 +159,7 @@ public class BatchNormDirectedSynapsesImpl<L extends Neurons, R extends Neurons>
     Matrix varianceMatrix =
         getVarianceMatrix(input, context.getMatrixFactory(), meanMatrix);
 
-    Matrix xhat = divi(input.getActivations().sub(meanMatrix), varianceMatrix);
+    Matrix xhat = input.getActivations().sub(meanMatrix).divi(varianceMatrix);
 
     NeuronsActivation xhatN =
         new NeuronsActivation(xhat, synapsesInput.getInput().getFeatureOrientation());
@@ -231,22 +231,6 @@ public class BatchNormDirectedSynapsesImpl<L extends Neurons, R extends Neurons>
     }
 
     return meanMatrix;
-  }
-
-  /**
-   * Temporary method for prototype purposes until divi is implemented in Matrix interface.
-   * 
-   * @param matrix The input matrix.
-   * @param by The matrix we are dividing the input matrix by.
-   * @return The input matrix with amended inline entries for the division result.
-   */
-  private Matrix divi(Matrix matrix, Matrix by) {
-    for (int r = 0; r < matrix.getRows(); r++) {
-      for (int c = 0; c < matrix.getColumns(); c++) {
-        matrix.put(r, c, matrix.get(r, c) / by.get(r, c));
-      }
-    }
-    return matrix;
   }
 
   @Override
