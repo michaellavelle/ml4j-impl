@@ -73,7 +73,7 @@ public class BatchNormDirectedSynapsesImpl<L extends Neurons, R extends Neurons>
         activationFunction.activate(axonsActivation.getOutput(), context);
 
     return new BatchNormDirectedSynapsesActivationImpl(this, scaleAndShiftAxons, input,
-        axonsActivation, activationFunctionActivation, axonsActivation.getOutput());
+        axonsActivation, activationFunctionActivation, axonsActivation.getOutput(), varianceMatrix);
   }
 
   /**

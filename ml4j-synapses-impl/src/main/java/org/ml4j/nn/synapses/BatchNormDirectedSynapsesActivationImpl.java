@@ -1,7 +1,6 @@
 package org.ml4j.nn.synapses;
 
 import org.ml4j.Matrix;
-import org.ml4j.MatrixFactory;
 import org.ml4j.nn.activationfunctions.DifferentiableActivationFunctionActivation;
 import org.ml4j.nn.axons.AxonsActivation;
 import org.ml4j.nn.axons.ScaleAndShiftAxons;
@@ -12,6 +11,7 @@ import org.ml4j.nn.neurons.NeuronsActivationWithPossibleBiasUnit;
 public class BatchNormDirectedSynapsesActivationImpl extends DirectedSynapsesActivationBase {
 
   private ScaleAndShiftAxons scaleAndShiftAxons;
+  private Matrix varianceMatrix;
   
   /**
    * @param synapses The synapses.
@@ -25,10 +25,11 @@ public class BatchNormDirectedSynapsesActivationImpl extends DirectedSynapsesAct
       ScaleAndShiftAxons scaleAndShiftAxons, 
       NeuronsActivation inputActivation, AxonsActivation axonsActivation,
       DifferentiableActivationFunctionActivation activationFunctionActivation,
-      NeuronsActivation outputActivation) {
+      NeuronsActivation outputActivation, Matrix varianceMatrix) {
     super(synapses, inputActivation, axonsActivation, 
         activationFunctionActivation, outputActivation);
     this.scaleAndShiftAxons = scaleAndShiftAxons;
+    this.varianceMatrix = varianceMatrix;
   }
 
   @Override
@@ -91,13 +92,6 @@ public class BatchNormDirectedSynapsesActivationImpl extends DirectedSynapsesAct
     }
 
     int num = xhat.getRows();
-
-    NeuronsActivation input = getInput();
-
-    Matrix meanMatrix = getMeanMatrix(input, context.getMatrixFactory());
-
-    Matrix varianceMatrix =
-        getVarianceMatrix(input, context.getMatrixFactory(), meanMatrix);
 
     Matrix istd = context.getMatrixFactory().createMatrix(varianceMatrix.getRows(),
         varianceMatrix.getColumns());
@@ -193,13 +187,6 @@ public class BatchNormDirectedSynapsesActivationImpl extends DirectedSynapsesAct
 
     int num = xhat.getRows();
 
-    NeuronsActivation input = getInput();
-
-    Matrix meanMatrix = getMeanMatrix(input, context.getMatrixFactory());
-
-    Matrix varianceMatrix =
-        getVarianceMatrix(input, context.getMatrixFactory(), meanMatrix);
-
     Matrix istd = context.getMatrixFactory().createMatrix(varianceMatrix.getRows(),
         varianceMatrix.getColumns());
 
@@ -231,65 +218,6 @@ public class BatchNormDirectedSynapsesActivationImpl extends DirectedSynapsesAct
     return new DirectedSynapsesGradientImpl(dxn, axonsGradient.transpose());
   }
   
-  /**
-   * Naive implementation to construct a variance row vector with an entry for each feature.
-   * 
-   * @param matrix The input matrix
-   * @param matrixFactory The matrix factory.
-   * @param meanRowVector The mean row vector.
-   * @return A row vector the the variances.
-   */
-  private Matrix getVarianceRowVector(Matrix matrix, MatrixFactory matrixFactory,
-      Matrix meanRowVector) {
-    Matrix rowVector = matrixFactory.createMatrix(1, matrix.getColumns());
-    for (int c = 0; c < matrix.getColumns(); c++) {
-      double total = 0d;
-      double count = 0;
-      for (int r = 0; r < matrix.getRows(); r++) {
-        double diff = (matrix.get(r, c) - meanRowVector.get(c));
-        total = total + diff * diff;
-        count++;
-      }
-      double variance = total / (count - 1);
-
-      double epsilion = 0.00000001;
-      double varianceVal = Math.sqrt(variance * variance + epsilion);
-      rowVector.put(0, c, varianceVal);
-    }
-    return rowVector;
-  }
-
-  private Matrix getVarianceMatrix(NeuronsActivation input, MatrixFactory matrixFactory,
-      Matrix meanRowVector) {
-
-    Matrix varianceMatrix = matrixFactory.createMatrix(input.getActivations().getRows(),
-        input.getActivations().getColumns());
-    for (int r = 0; r < varianceMatrix.getRows(); r++) {
-      varianceMatrix.putRow(r,
-          getVarianceRowVector(input.getActivations(), matrixFactory, meanRowVector));
-    }
-
-    return varianceMatrix;
-  }
-
-  private Matrix getMeanRowVector(Matrix matrix, MatrixFactory matrixFactory) {
-    Matrix rowVector = matrixFactory.createMatrix(1, matrix.getColumns());
-    for (int c = 0; c < matrix.getColumns(); c++) {
-      double mean = matrix.getColumn(c).sum() / matrix.getRows();
-      rowVector.put(0, c, mean);
-    }
-    return rowVector;
-  }
-
-  private Matrix getMeanMatrix(NeuronsActivation input, MatrixFactory matrixFactory) {
-
-    Matrix meanMatrix = matrixFactory.createMatrix(input.getActivations().getRows(),
-        input.getActivations().getColumns());
-    for (int r = 0; r < meanMatrix.getRows(); r++) {
-      meanMatrix.putRow(r, getMeanRowVector(input.getActivations(), matrixFactory));
-    }
-
-    return meanMatrix;
-  }
+ 
 
 }
