@@ -3,13 +3,14 @@ package org.ml4j.nn.synapses;
 import org.ml4j.Matrix;
 import org.ml4j.nn.activationfunctions.DifferentiableActivationFunctionActivation;
 import org.ml4j.nn.axons.AxonsActivation;
+import org.ml4j.nn.axons.AxonsContext;
 import org.ml4j.nn.axons.ScaleAndShiftAxons;
 import org.ml4j.nn.costfunctions.CostFunctionGradient;
 import org.ml4j.nn.neurons.NeuronsActivation;
 import org.ml4j.nn.neurons.NeuronsActivationWithPossibleBiasUnit;
 
 public class BatchNormDirectedSynapsesActivationImpl extends DirectedSynapsesActivationBase {
-
+  
   private ScaleAndShiftAxons scaleAndShiftAxons;
   private Matrix varianceMatrix;
   
@@ -34,7 +35,7 @@ public class BatchNormDirectedSynapsesActivationImpl extends DirectedSynapsesAct
 
   @Override
   public DirectedSynapsesGradient backPropagate(DirectedSynapsesGradient outerGradient,
-      DirectedSynapsesContext context, double regularisation) {
+      DirectedSynapsesContext context) {
  
     NeuronsActivationWithPossibleBiasUnit xhatn1 =
         getAxonsActivation().getPostDropoutInputWithPossibleBias()
@@ -124,8 +125,13 @@ public class BatchNormDirectedSynapsesActivationImpl extends DirectedSynapsesAct
   
   @Override
   public DirectedSynapsesGradient backPropagate(CostFunctionGradient outerGradient,
-      DirectedSynapsesContext context, double regularisation) {
+      DirectedSynapsesContext context) {
  
+    AxonsContext axonsContext = context.getAxonsContext(0);
+    if (axonsContext.getLeftHandInputDropoutKeepProbability() != 1d) {
+      throw new UnsupportedOperationException(
+          "Reguarlisation of batch norm synapses not yet supported");
+    }
 
     NeuronsActivationWithPossibleBiasUnit xhatn1 =
         getAxonsActivation().getPostDropoutInputWithPossibleBias()
@@ -157,6 +163,8 @@ public class BatchNormDirectedSynapsesActivationImpl extends DirectedSynapsesAct
 
 
     Matrix dgamma = xhat.mul(dout).transpose().rowSums().transpose();
+    
+    
 
 
     // gamma, xhat, istd = cache
@@ -214,10 +222,20 @@ public class BatchNormDirectedSynapsesActivationImpl extends DirectedSynapsesAct
     Matrix axonsGradient = context.getMatrixFactory().createMatrix(2, dgamma.getColumns());
     axonsGradient.putRow(0, dgamma);
     axonsGradient.putRow(1, dbeta);
+    
 
     return new DirectedSynapsesGradientImpl(dxn, axonsGradient.transpose());
   }
   
  
 
+  @Override
+  public double getTotalRegularisationCost(DirectedSynapsesContext synapsesContext) {
+    AxonsContext axonsContext = synapsesContext.getAxonsContext(0);
+    if (axonsContext.getLeftHandInputDropoutKeepProbability() != 1d) {
+      throw new UnsupportedOperationException(
+          "Reguarlisation of batch norm synapses not yet supported");
+    }
+    return 0;
+  }
 }
