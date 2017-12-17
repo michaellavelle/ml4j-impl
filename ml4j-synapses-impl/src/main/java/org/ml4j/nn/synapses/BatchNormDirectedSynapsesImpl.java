@@ -8,6 +8,7 @@ import org.ml4j.nn.axons.Axons;
 import org.ml4j.nn.axons.AxonsActivation;
 import org.ml4j.nn.axons.ScaleAndShiftAxons;
 import org.ml4j.nn.neurons.Neurons;
+import org.ml4j.nn.neurons.NeuronsActivation;
 
 /**
  * Default implementation of batch-norm DirectedSynapses
@@ -66,7 +67,7 @@ public class BatchNormDirectedSynapsesImpl<L extends Neurons, R extends Neurons>
 
     // y = gamma * xhat + beta
     AxonsActivation axonsActivation =
-        scaleAndShiftAxons.pushLeftToRight(xhatN, null, context.createAxonsContext());
+        scaleAndShiftAxons.pushLeftToRight(xhatN, null, context.getAxonsContext(0));
 
     DifferentiableActivationFunctionActivation activationFunctionActivation =
         activationFunction.activate(axonsActivation.getOutput(), context);
