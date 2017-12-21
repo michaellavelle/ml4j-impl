@@ -72,7 +72,7 @@ public class BatchNormDirectedSynapsesImpl<L extends Neurons, R extends Neurons>
     DifferentiableActivationFunctionActivation activationFunctionActivation =
         activationFunction.activate(axonsActivation.getOutput(), context);
 
-    return new BatchNormDirectedSynapsesActivationImpl(this, scaleAndShiftAxons, input,
+    return new BatchNormDirectedSynapsesActivationImpl(this, scaleAndShiftAxons, synapsesInput,
         axonsActivation, activationFunctionActivation, axonsActivation.getOutput(), varianceMatrix);
   }
 
