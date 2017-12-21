@@ -19,7 +19,7 @@ import org.ml4j.nn.neurons.NeuronsActivation;
  * @param <R> The Neurons on the right hand side of these batch-norm DirectedSynapses.
  */
 public class BatchNormDirectedSynapsesImpl<L extends Neurons, R extends Neurons>
-    implements DirectedSynapses<L, R> {
+    implements BatchNormDirectedSynapses<L, R> {
 
   /**
    * Default serialization id.
@@ -29,6 +29,10 @@ public class BatchNormDirectedSynapsesImpl<L extends Neurons, R extends Neurons>
   private R rightNeurons;
   private ScaleAndShiftAxons scaleAndShiftAxons;
   private DifferentiableActivationFunction activationFunction;
+  
+  private Matrix exponentiallyWeightedAverageInputFeatureMeans;
+  private Matrix exponentiallyWeightedAverageInputFeatureVariances;
+  private double betaForExponentiallyWeightedAverages;
 
   /**
    * @param leftNeurons The left neurons.
@@ -41,7 +45,7 @@ public class BatchNormDirectedSynapsesImpl<L extends Neurons, R extends Neurons>
     this.rightNeurons = rightNeurons;
     this.scaleAndShiftAxons = scaleAndShiftAxons;
     this.activationFunction = activationFunction;
-
+    this.betaForExponentiallyWeightedAverages = 0.9;
   }
 
   @Override
@@ -73,7 +77,8 @@ public class BatchNormDirectedSynapsesImpl<L extends Neurons, R extends Neurons>
         activationFunction.activate(axonsActivation.getOutput(), context);
 
     return new BatchNormDirectedSynapsesActivationImpl(this, scaleAndShiftAxons, synapsesInput,
-        axonsActivation, activationFunctionActivation, axonsActivation.getOutput(), varianceMatrix);
+        axonsActivation, activationFunctionActivation, axonsActivation.getOutput(), 
+        meanMatrix, varianceMatrix);
   }
 
   /**
@@ -107,14 +112,24 @@ public class BatchNormDirectedSynapsesImpl<L extends Neurons, R extends Neurons>
   private Matrix getVarianceMatrix(NeuronsActivation input, MatrixFactory matrixFactory,
       Matrix meanRowVector) {
 
-    Matrix varianceMatrix = matrixFactory.createMatrix(input.getActivations().getRows(),
-        input.getActivations().getColumns());
-    for (int r = 0; r < varianceMatrix.getRows(); r++) {
-      varianceMatrix.putRow(r,
-          getVarianceRowVector(input.getActivations(), matrixFactory, meanRowVector));
-    }
+    if (input.getActivations().getRows() == 1) {
+      if (exponentiallyWeightedAverageInputFeatureVariances != null) {
+        return exponentiallyWeightedAverageInputFeatureVariances;
+      } else {
+        throw new IllegalStateException("Unable to calcuate mean and variance for batch "
+            + "norm on a single example - no exponentially weighted average available");
+      }
+    } else {
 
-    return varianceMatrix;
+      Matrix varianceMatrix = matrixFactory.createMatrix(input.getActivations().getRows(),
+          input.getActivations().getColumns());
+      for (int r = 0; r < varianceMatrix.getRows(); r++) {
+        varianceMatrix.putRow(r,
+            getVarianceRowVector(input.getActivations(), matrixFactory, meanRowVector));
+      }
+
+      return varianceMatrix;
+    }
   }
 
   private Matrix getMeanRowVector(Matrix matrix, MatrixFactory matrixFactory) {
@@ -128,13 +143,21 @@ public class BatchNormDirectedSynapsesImpl<L extends Neurons, R extends Neurons>
 
   private Matrix getMeanMatrix(NeuronsActivation input, MatrixFactory matrixFactory) {
 
-    Matrix meanMatrix = matrixFactory.createMatrix(input.getActivations().getRows(),
-        input.getActivations().getColumns());
-    for (int r = 0; r < meanMatrix.getRows(); r++) {
-      meanMatrix.putRow(r, getMeanRowVector(input.getActivations(), matrixFactory));
+    if (input.getActivations().getRows() == 1) {
+      if (exponentiallyWeightedAverageInputFeatureMeans != null) {
+        return exponentiallyWeightedAverageInputFeatureMeans;
+      } else {
+        throw new IllegalStateException("Unable to calcuate mean and variance for batch "
+            + "norm on a single example - no exponentially weighted average available");
+      }
+    } else {
+      Matrix meanMatrix = matrixFactory.createMatrix(input.getActivations().getRows(),
+          input.getActivations().getColumns());
+      for (int r = 0; r < meanMatrix.getRows(); r++) {
+        meanMatrix.putRow(r, getMeanRowVector(input.getActivations(), matrixFactory));
+      }
+      return meanMatrix;
     }
-
-    return meanMatrix;
   }
 
   @Override
@@ -156,4 +179,34 @@ public class BatchNormDirectedSynapsesImpl<L extends Neurons, R extends Neurons>
   public Axons<?, ?, ?> getAxons() {
     return scaleAndShiftAxons;
   }
+
+  @Override
+  public double getBetaForExponentiallyWeightedAverages() {
+    return betaForExponentiallyWeightedAverages;
+  }
+
+  @Override
+  public Matrix getExponentiallyWeightedAverageInputFeatureMeans() {
+    return exponentiallyWeightedAverageInputFeatureMeans;
+  }
+
+  @Override
+  public Matrix getExponentiallyWeightedAverageInputFeatureVariances() {
+    return exponentiallyWeightedAverageInputFeatureVariances;
+  }
+
+  @Override
+  public void setExponentiallyWeightedAverageInputFeatureMeans(
+      Matrix exponentiallyWeightedAverageInputFeatureMeans) {
+    this.exponentiallyWeightedAverageInputFeatureMeans =
+        exponentiallyWeightedAverageInputFeatureMeans;
+  }
+
+  @Override
+  public void setExponentiallyWeightedAverageInputFeatureVariances(
+      Matrix exponentiallyWeightedAverageInputFeatureVariances) {
+    this.exponentiallyWeightedAverageInputFeatureVariances =
+        exponentiallyWeightedAverageInputFeatureVariances;
+  }
+  
 }

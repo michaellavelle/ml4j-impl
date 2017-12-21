@@ -13,7 +13,9 @@ import org.ml4j.nn.neurons.NeuronsActivationWithPossibleBiasUnit;
 public class BatchNormDirectedSynapsesActivationImpl extends DirectedSynapsesActivationBase {
   
   private ScaleAndShiftAxons scaleAndShiftAxons;
+  private Matrix meanMatrix;
   private Matrix varianceMatrix;
+  private BatchNormDirectedSynapses<?, ?> batchNormSynapses;
   
   /**
    * @param synapses The synapses.
@@ -23,20 +25,52 @@ public class BatchNormDirectedSynapsesActivationImpl extends DirectedSynapsesAct
    * @param activationFunctionActivation The activation function activation.
    * @param outputActivation The output activation.
    */
-  public BatchNormDirectedSynapsesActivationImpl(DirectedSynapses<?, ?> synapses, 
+  public BatchNormDirectedSynapsesActivationImpl(BatchNormDirectedSynapses<?, ?> synapses, 
       ScaleAndShiftAxons scaleAndShiftAxons, 
       DirectedSynapsesInput inputActivation, AxonsActivation axonsActivation,
       DifferentiableActivationFunctionActivation activationFunctionActivation,
-      NeuronsActivation outputActivation, Matrix varianceMatrix) {
+      NeuronsActivation outputActivation, Matrix meanMatrix, Matrix varianceMatrix) {
     super(synapses, inputActivation, axonsActivation, 
         activationFunctionActivation, outputActivation);
     this.scaleAndShiftAxons = scaleAndShiftAxons;
+    this.meanMatrix = meanMatrix;
     this.varianceMatrix = varianceMatrix;
+    this.batchNormSynapses = synapses;
   }
 
   @Override
   public DirectedSynapsesGradient backPropagate(DirectedSynapsesGradient outerGradient,
       DirectedSynapsesContext context) {
+    
+    // Build up the exponentially weighted averages
+    
+    Matrix exponentiallyWeightedAverageMean = 
+        batchNormSynapses.getExponentiallyWeightedAverageInputFeatureMeans();
+    
+    double beta = batchNormSynapses.getBetaForExponentiallyWeightedAverages();
+    
+    if (exponentiallyWeightedAverageMean == null) {
+      exponentiallyWeightedAverageMean = meanMatrix.getRow(0);
+    } else {
+      exponentiallyWeightedAverageMean =
+          exponentiallyWeightedAverageMean.mul(beta).add(meanMatrix.getRow(0).mul(1 - beta));
+    }
+    batchNormSynapses
+        .setExponentiallyWeightedAverageInputFeatureMeans(exponentiallyWeightedAverageMean);
+
+    Matrix exponentiallyWeightedAverageVariance =
+        batchNormSynapses.getExponentiallyWeightedAverageInputFeatureVariances();
+
+
+    if (exponentiallyWeightedAverageVariance == null) {
+      exponentiallyWeightedAverageVariance = varianceMatrix.getRow(0);
+    } else {
+      exponentiallyWeightedAverageVariance = exponentiallyWeightedAverageVariance.mul(beta)
+          .add(varianceMatrix.getRow(0).mul(1 - beta));
+    }
+    batchNormSynapses
+        .setExponentiallyWeightedAverageInputFeatureVariances(exponentiallyWeightedAverageVariance);
+
  
     NeuronsActivationWithPossibleBiasUnit xhatn1 =
         getAxonsActivation().getPostDropoutInputWithPossibleBias()
