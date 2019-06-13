@@ -55,7 +55,7 @@ public class ReluActivationFunction implements DifferentiableActivationFunction 
         }
       }
     }
-    return new DifferentiableActivationFunctionActivationImpl(this, input, output);
+    return new DifferentiableActivationFunctionActivationImpl(this, input, output, context);
   }
 
   @Override

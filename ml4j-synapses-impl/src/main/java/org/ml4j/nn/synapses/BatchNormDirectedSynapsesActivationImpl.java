@@ -1,19 +1,38 @@
 package org.ml4j.nn.synapses;
 
+import java.util.ArrayList;
+
 import org.ml4j.Matrix;
 import org.ml4j.MatrixFactory;
 import org.ml4j.nn.activationfunctions.DifferentiableActivationFunctionActivation;
 import org.ml4j.nn.axons.AxonsActivation;
 import org.ml4j.nn.axons.AxonsContext;
+import org.ml4j.nn.axons.AxonsContextImpl;
 import org.ml4j.nn.axons.AxonsGradientImpl;
+import org.ml4j.nn.axons.DirectedAxonsComponent;
+import org.ml4j.nn.axons.DirectedAxonsComponentActivation;
 import org.ml4j.nn.axons.ScaleAndShiftAxons;
+import org.ml4j.nn.components.DirectedComponentGradient;
+import org.ml4j.nn.components.DirectedComponentGradientImpl;
+import org.ml4j.nn.components.DirectedComponentsContext;
 import org.ml4j.nn.costfunctions.CostFunctionGradient;
+import org.ml4j.nn.graph.DirectedDipoleGraphImpl;
 import org.ml4j.nn.neurons.NeuronsActivation;
+import org.ml4j.nn.neurons.NeuronsActivationContext;
 import org.ml4j.nn.neurons.NeuronsActivationWithPossibleBiasUnit;
 
 public class BatchNormDirectedSynapsesActivationImpl extends DirectedSynapsesActivationBase {
   
   private ScaleAndShiftAxons scaleAndShiftAxons;
+  private AxonsActivation primaryAxonsActivation;
+  private DirectedAxonsComponent<?, ?> axonsComponent;
+  private DirectedAxonsComponentActivation scaleAndShiftAxonsComponentActivation;
+  private AxonsActivation scaleAndShiftAxonsActivation;
+  //private TrainableAxons<?, ?, ?> primaryAxons;
+
+  private Matrix meanMatrix;
+  private Matrix varianceMatrix;
+  private BatchNormDirectedSynapses<?, ?> batchNormSynapses;
   
   /**
    * @param synapses The synapses.
@@ -23,29 +42,73 @@ public class BatchNormDirectedSynapsesActivationImpl extends DirectedSynapsesAct
    * @param activationFunctionActivation The activation function activation.
    * @param outputActivation The output activation.
    */
-  public BatchNormDirectedSynapsesActivationImpl(DirectedSynapses<?, ?> synapses, 
+  public BatchNormDirectedSynapsesActivationImpl(BatchNormDirectedSynapses<?, ?> synapses,
       ScaleAndShiftAxons scaleAndShiftAxons, 
-      DirectedSynapsesInput inputActivation, AxonsActivation axonsActivation,
+      NeuronsActivation inputActivation,
+      DirectedAxonsComponentActivation scaleAndShiftAxonsComponentActivation, AxonsActivation scaleAndShiftAxonsActivation, 
       DifferentiableActivationFunctionActivation activationFunctionActivation,
-      NeuronsActivation outputActivation) {
-    super(synapses, inputActivation, axonsActivation, 
-        activationFunctionActivation, outputActivation);
+      NeuronsActivation outputActivation, Matrix meanMatrix, Matrix varianceMatrix, DirectedComponentsContext directedSynapsesContext) {
+    super(synapses, inputActivation, 
+        new DirectedDipoleGraphImpl<DirectedAxonsComponentActivation>(scaleAndShiftAxonsComponentActivation), 
+        activationFunctionActivation, outputActivation, directedSynapsesContext);
     this.scaleAndShiftAxons = scaleAndShiftAxons;
+    this.scaleAndShiftAxonsComponentActivation = scaleAndShiftAxonsComponentActivation;
+    this.scaleAndShiftAxonsActivation = scaleAndShiftAxonsActivation;
+    //this.primaryAxonsActivation = primaryAxonsActivation;
+    //this.primaryAxons = primaryAxons;
+    this.axonsComponent = scaleAndShiftAxonsComponentActivation.getAxonsComponent();
+    this.meanMatrix = meanMatrix;
+    this.varianceMatrix = varianceMatrix;
+    this.batchNormSynapses = synapses;
   }
 
   @Override
-  public DirectedSynapsesGradient backPropagate(DirectedSynapsesGradient outerGradient,
-      DirectedSynapsesContext context) {
+  public DirectedComponentGradient<NeuronsActivation> backPropagate(DirectedComponentGradient<NeuronsActivation> outerGradient) {
+    
+    // Build up the exponentially weighted averages
+    
+    Matrix exponentiallyWeightedAverageMean = 
+        batchNormSynapses.getExponentiallyWeightedAverageInputFeatureMeans();
+    
+    double beta = batchNormSynapses.getBetaForExponentiallyWeightedAverages();
+    
+    if (exponentiallyWeightedAverageMean == null) {
+      exponentiallyWeightedAverageMean = meanMatrix.getRow(0);
+    } else {
+      exponentiallyWeightedAverageMean =
+          exponentiallyWeightedAverageMean.mul(beta).add(meanMatrix.getRow(0).mul(1 - beta));
+    }
+    batchNormSynapses
+        .setExponentiallyWeightedAverageInputFeatureMeans(exponentiallyWeightedAverageMean);
+
+    Matrix exponentiallyWeightedAverageVariance =
+        batchNormSynapses.getExponentiallyWeightedAverageInputFeatureVariances();
+
+
+    if (exponentiallyWeightedAverageVariance == null) {
+      exponentiallyWeightedAverageVariance = varianceMatrix.getRow(0);
+    } else {
+      exponentiallyWeightedAverageVariance = exponentiallyWeightedAverageVariance.mul(beta)
+          .add(varianceMatrix.getRow(0).mul(1 - beta));
+    }
+    batchNormSynapses
+        .setExponentiallyWeightedAverageInputFeatureVariances(exponentiallyWeightedAverageVariance);
+
  
+    //DirectedComponentGradient<NeuronsActivation> b = scaleAndShiftAxonsActivation.backPropagate(outerGradient);
+    
     NeuronsActivationWithPossibleBiasUnit xhatn1 =
-        getAxonsActivation().getPostDropoutInputWithPossibleBias()
-        .withBiasUnit(false, context);
+    		scaleAndShiftAxonsActivation.getPostDropoutInputWithPossibleBias()
+        .withBiasUnit(false, synapsesContext.getContext(axonsComponent, () -> new AxonsContextImpl(synapsesContext.getMatrixFactory(), false)));
     
     NeuronsActivation xhatn = new NeuronsActivation(xhatn1.getActivations(), 
         xhatn1.getFeatureOrientation());
     
     Matrix xhat = xhatn.getActivations();
-    Matrix dout = outerGradient.getOutput().getActivations().transpose();
+    
+    Matrix dout = activationFunctionActivation.backPropagate(outerGradient).getOutput().getActivations().transpose();
+    
+    
 
     /**
      * . xhat:1000:101COLUMNS_SPAN_FEATURE_SET dout:100:1000ROWS_SPAN_FEATURE_SET
@@ -80,28 +143,21 @@ public class BatchNormDirectedSynapsesActivationImpl extends DirectedSynapsesAct
     // System.out.println("xhat:" + xhat.getRows() + ":" + xhat.getColumns());
 
 
-    Matrix dgammab = context.getMatrixFactory().createMatrix(xhat.getRows(), xhat.getColumns());
+    Matrix dgammab = synapsesContext.getMatrixFactory().createMatrix(xhat.getRows(), xhat.getColumns());
     for (int i = 0; i < xhat.getRows(); i++) {
       dgammab.putRow(i, dgamma);
     }
 
     Matrix dbeta = dout.transpose().rowSums().transpose();
 
-    Matrix dbetab = context.getMatrixFactory().createMatrix(xhat.getRows(), xhat.getColumns());
+    Matrix dbetab = synapsesContext.getMatrixFactory().createMatrix(xhat.getRows(), xhat.getColumns());
     for (int i = 0; i < xhat.getRows(); i++) {
       dbetab.putRow(i, dbeta);
     }
 
     int num = xhat.getRows();
 
-    NeuronsActivation input = getInput().getInput();
-
-    Matrix meanMatrix = getMeanMatrix(input, context.getMatrixFactory());
-
-    Matrix varianceMatrix =
-        getVarianceMatrix(input, context.getMatrixFactory(), meanMatrix);
-
-    Matrix istd = context.getMatrixFactory().createMatrix(varianceMatrix.getRows(),
+    Matrix istd = synapsesContext.getMatrixFactory().createMatrix(varianceMatrix.getRows(),
         varianceMatrix.getColumns());
 
     for (int r = 0; r < varianceMatrix.getRows(); r++) {
@@ -112,7 +168,7 @@ public class BatchNormDirectedSynapsesActivationImpl extends DirectedSynapsesAct
 
     Matrix gammaRow = scaleAndShiftAxons.getScaleRowVector();
 
-    Matrix gamma = context.getMatrixFactory().createMatrix(num, gammaRow.getColumns());
+    Matrix gamma = synapsesContext.getMatrixFactory().createMatrix(num, gammaRow.getColumns());
     for (int i = 0; i < num; i++) {
       gamma.putRow(i, gammaRow);
     }
@@ -122,28 +178,39 @@ public class BatchNormDirectedSynapsesActivationImpl extends DirectedSynapsesAct
     NeuronsActivation dxn =
         new NeuronsActivation(dx.transpose(), outerGradient.getOutput().getFeatureOrientation());
 
-    Matrix axonsGradient = context.getMatrixFactory().createMatrix(2, dgamma.getColumns());
+    Matrix axonsGradient = synapsesContext.getMatrixFactory().createMatrix(2, dgamma.getColumns());
     axonsGradient.putRow(0, dgamma);
     axonsGradient.putRow(1, dbeta);
-
-    return new DirectedSynapsesGradientImpl(dxn, 
-        new AxonsGradientImpl(scaleAndShiftAxons, axonsGradient.transpose()));
+    
+   
+    return new DirectedComponentGradientImpl<>( outerGradient.getTotalTrainableAxonsGradients(),
+        new AxonsGradientImpl(scaleAndShiftAxons, axonsGradient.transpose()), dxn);
   }
   
   
   @Override
-  public DirectedSynapsesGradient backPropagate(CostFunctionGradient outerGradient,
-      DirectedSynapsesContext context) {
+  public DirectedComponentGradient<NeuronsActivation> backPropagate(CostFunctionGradient outerGradient) {
  
-    AxonsContext axonsContext = context.getAxonsContext(0);
+    AxonsContext axonsContext = synapsesContext.getContext(this.axonsComponent, () -> new AxonsContextImpl(synapsesContext.getMatrixFactory(), false));
     if (axonsContext.getLeftHandInputDropoutKeepProbability() != 1d) {
       throw new UnsupportedOperationException(
-          "Reguarlisation of batch norm synapses not yet supported");
+          "Dropout of batch norm synapses not yet supported");
     }
 
     NeuronsActivationWithPossibleBiasUnit xhatn1 =
-        getAxonsActivation().getPostDropoutInputWithPossibleBias()
-        .withBiasUnit(false, context);
+    		scaleAndShiftAxonsActivation.getPostDropoutInputWithPossibleBias()
+        .withBiasUnit(false, new NeuronsActivationContext() {
+
+			/**
+			 * 
+			 */
+			private static final long serialVersionUID = 1L;
+
+			@Override
+			public MatrixFactory getMatrixFactory() {
+				// TODO Auto-generated method stub
+				return synapsesContext.getMatrixFactory();
+			}});
     
     NeuronsActivation xhatn = new NeuronsActivation(xhatn1.getActivations(), 
         xhatn1.getFeatureOrientation());
@@ -189,28 +256,21 @@ public class BatchNormDirectedSynapsesActivationImpl extends DirectedSynapsesAct
     // System.out.println("xhat:" + xhat.getRows() + ":" + xhat.getColumns());
 
 
-    Matrix dgammab = context.getMatrixFactory().createMatrix(xhat.getRows(), xhat.getColumns());
+    Matrix dgammab = synapsesContext.getMatrixFactory().createMatrix(xhat.getRows(), xhat.getColumns());
     for (int i = 0; i < xhat.getRows(); i++) {
       dgammab.putRow(i, dgamma);
     }
 
     Matrix dbeta = dout.transpose().rowSums().transpose();
 
-    Matrix dbetab = context.getMatrixFactory().createMatrix(xhat.getRows(), xhat.getColumns());
+    Matrix dbetab = synapsesContext.getMatrixFactory().createMatrix(xhat.getRows(), xhat.getColumns());
     for (int i = 0; i < xhat.getRows(); i++) {
       dbetab.putRow(i, dbeta);
     }
 
     int num = xhat.getRows();
 
-    NeuronsActivation input = getInput().getInput();
-
-    Matrix meanMatrix = getMeanMatrix(input, context.getMatrixFactory());
-
-    Matrix varianceMatrix =
-        getVarianceMatrix(input, context.getMatrixFactory(), meanMatrix);
-
-    Matrix istd = context.getMatrixFactory().createMatrix(varianceMatrix.getRows(),
+    Matrix istd = synapsesContext.getMatrixFactory().createMatrix(varianceMatrix.getRows(),
         varianceMatrix.getColumns());
 
     for (int r = 0; r < varianceMatrix.getRows(); r++) {
@@ -221,7 +281,7 @@ public class BatchNormDirectedSynapsesActivationImpl extends DirectedSynapsesAct
 
     Matrix gammaRow = scaleAndShiftAxons.getScaleRowVector();
 
-    Matrix gamma = context.getMatrixFactory().createMatrix(num, gammaRow.getColumns());
+    Matrix gamma = synapsesContext.getMatrixFactory().createMatrix(num, gammaRow.getColumns());
     for (int i = 0; i < num; i++) {
       gamma.putRow(i, gammaRow);
     }
@@ -234,79 +294,19 @@ public class BatchNormDirectedSynapsesActivationImpl extends DirectedSynapsesAct
             activationFunctionActivation.getActivationFunction()).getOutput()
             .getFeatureOrientation());
 
-    Matrix axonsGradient = context.getMatrixFactory().createMatrix(2, dgamma.getColumns());
+    Matrix axonsGradient = synapsesContext.getMatrixFactory().createMatrix(2, dgamma.getColumns());
     axonsGradient.putRow(0, dgamma);
     axonsGradient.putRow(1, dbeta);
     
-
-    return new DirectedSynapsesGradientImpl(dxn, 
-        new AxonsGradientImpl(scaleAndShiftAxons, axonsGradient.transpose()));
+    return new DirectedComponentGradientImpl<>(new ArrayList<>(), 
+        new AxonsGradientImpl(scaleAndShiftAxons, axonsGradient.transpose()), dxn);
   }
   
-  /**
-   * Naive implementation to construct a variance row vector with an entry for each feature.
-   * 
-   * @param matrix The input matrix
-   * @param matrixFactory The matrix factory.
-   * @param meanRowVector The mean row vector.
-   * @return A row vector the the variances.
-   */
-  private Matrix getVarianceRowVector(Matrix matrix, MatrixFactory matrixFactory,
-      Matrix meanRowVector) {
-    Matrix rowVector = matrixFactory.createMatrix(1, matrix.getColumns());
-    for (int c = 0; c < matrix.getColumns(); c++) {
-      double total = 0d;
-      double count = 0;
-      for (int r = 0; r < matrix.getRows(); r++) {
-        double diff = (matrix.get(r, c) - meanRowVector.get(c));
-        total = total + diff * diff;
-        count++;
-      }
-      double variance = total / (count - 1);
-
-      double epsilion = 0.00000001;
-      double varianceVal = Math.sqrt(variance * variance + epsilion);
-      rowVector.put(0, c, varianceVal);
-    }
-    return rowVector;
-  }
-
-  private Matrix getVarianceMatrix(NeuronsActivation input, MatrixFactory matrixFactory,
-      Matrix meanRowVector) {
-
-    Matrix varianceMatrix = matrixFactory.createMatrix(input.getActivations().getRows(),
-        input.getActivations().getColumns());
-    for (int r = 0; r < varianceMatrix.getRows(); r++) {
-      varianceMatrix.putRow(r,
-          getVarianceRowVector(input.getActivations(), matrixFactory, meanRowVector));
-    }
-
-    return varianceMatrix;
-  }
-
-  private Matrix getMeanRowVector(Matrix matrix, MatrixFactory matrixFactory) {
-    Matrix rowVector = matrixFactory.createMatrix(1, matrix.getColumns());
-    for (int c = 0; c < matrix.getColumns(); c++) {
-      double mean = matrix.getColumn(c).sum() / matrix.getRows();
-      rowVector.put(0, c, mean);
-    }
-    return rowVector;
-  }
-
-  private Matrix getMeanMatrix(NeuronsActivation input, MatrixFactory matrixFactory) {
-
-    Matrix meanMatrix = matrixFactory.createMatrix(input.getActivations().getRows(),
-        input.getActivations().getColumns());
-    for (int r = 0; r < meanMatrix.getRows(); r++) {
-      meanMatrix.putRow(r, getMeanRowVector(input.getActivations(), matrixFactory));
-    }
-
-    return meanMatrix;
-  }
+ 
 
   @Override
-  public double getTotalRegularisationCost(DirectedSynapsesContext synapsesContext) {
-    AxonsContext axonsContext = synapsesContext.getAxonsContext(0);
+  public double getTotalRegularisationCost(DirectedComponentsContext synapsesContext) {
+    AxonsContext axonsContext = synapsesContext.getContext(this.axonsComponent, () -> new AxonsContextImpl(synapsesContext.getMatrixFactory(), false));
     if (axonsContext.getLeftHandInputDropoutKeepProbability() != 1d) {
       throw new UnsupportedOperationException(
           "Reguarlisation of batch norm synapses not yet supported");

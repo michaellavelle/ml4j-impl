@@ -43,7 +43,7 @@ public class LinearActivationFunction implements DifferentiableActivationFunctio
     
     return new DifferentiableActivationFunctionActivationImpl(this, input, 
         new NeuronsActivation(input.getActivations().dup(),
-        input.getFeatureOrientation()));
+        input.getFeatureOrientation()), context);
   }
 
   @Override

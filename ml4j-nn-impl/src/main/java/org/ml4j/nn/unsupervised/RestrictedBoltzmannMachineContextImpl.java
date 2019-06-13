@@ -37,14 +37,9 @@ public class RestrictedBoltzmannMachineContextImpl implements RestrictedBoltzman
     this.layerContext = new UndirectedLayerContextImpl(0, matrixFactory);
   }
 
-  @Override
-  public UndirectedLayerContext getLayerContext(int layerIndex) {
-    if (layerIndex == 0) {
-      return layerContext;
-    } else {
-      throw new IllegalArgumentException(
-          "Restricted Boltzmann Machines have only a single " + "layer accessible at layerIndex 0");
-    }
+
+  public UndirectedLayerContext getLayerContext() {
+	  return layerContext;
   }
 
   @Override

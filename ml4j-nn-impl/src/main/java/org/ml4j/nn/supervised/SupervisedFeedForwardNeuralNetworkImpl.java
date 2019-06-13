@@ -14,13 +14,19 @@
 
 package org.ml4j.nn.supervised;
 
+import java.util.Arrays;
+import java.util.List;
+
 import org.ml4j.Matrix;
 import org.ml4j.MatrixFactory;
 import org.ml4j.nn.CostAndGradientsImpl;
 import org.ml4j.nn.FeedForwardNeuralNetworkBase;
 import org.ml4j.nn.FeedForwardNeuralNetworkContext;
 import org.ml4j.nn.ForwardPropagation;
-import org.ml4j.nn.layers.FeedForwardLayer;
+import org.ml4j.nn.components.ChainableDirectedComponent;
+import org.ml4j.nn.components.ChainableDirectedComponentActivation;
+import org.ml4j.nn.components.DirectedComponentChain;
+import org.ml4j.nn.components.defaults.DefaultDirectedComponentChainImpl;
 import org.ml4j.nn.neurons.NeuronsActivation;
 
 /**
@@ -29,7 +35,7 @@ import org.ml4j.nn.neurons.NeuronsActivation;
  * @author Michael Lavelle
  */
 public class SupervisedFeedForwardNeuralNetworkImpl 
-    extends FeedForwardNeuralNetworkBase<FeedForwardNeuralNetworkContext, 
+    extends FeedForwardNeuralNetworkBase<FeedForwardNeuralNetworkContext, DirectedComponentChain<NeuronsActivation, ?, ?, ?>,
     SupervisedFeedForwardNeuralNetwork> implements SupervisedFeedForwardNeuralNetwork {
   
   /**
@@ -42,8 +48,26 @@ public class SupervisedFeedForwardNeuralNetworkImpl
    * 
    * @param layers The layers
    */
-  public SupervisedFeedForwardNeuralNetworkImpl(FeedForwardLayer<?, ?>... layers) {
-    super(layers);
+  public SupervisedFeedForwardNeuralNetworkImpl(DirectedComponentChain<NeuronsActivation, ?, ?, ?> initialisingComponentChain) {
+    super(initialisingComponentChain);
+  }
+  
+  /**
+   * Constructor for a multi-layer supervised FeedForwardNeuralNetwork.
+   * 
+   * @param layers The layers
+   */
+  public SupervisedFeedForwardNeuralNetworkImpl(List<ChainableDirectedComponent<NeuronsActivation, ? extends ChainableDirectedComponentActivation<NeuronsActivation>, ?>> componentList) {
+    super(new DefaultDirectedComponentChainImpl<>(componentList));
+  }
+  
+  /**
+   * Constructor for a multi-layer supervised FeedForwardNeuralNetwork.
+   * 
+   * @param layers The layers
+   */
+  public SupervisedFeedForwardNeuralNetworkImpl(ChainableDirectedComponent<NeuronsActivation, ? extends ChainableDirectedComponentActivation<NeuronsActivation>, ?>... componentList) {
+    super(new DefaultDirectedComponentChainImpl<>(Arrays.asList(componentList)));
   }
 
   @Override
@@ -99,7 +123,8 @@ public class SupervisedFeedForwardNeuralNetworkImpl
 
   @Override
   public SupervisedFeedForwardNeuralNetwork dup() {
-    return new SupervisedFeedForwardNeuralNetworkImpl(getLayer(0), getLayer(1));
+	  throw new UnsupportedOperationException("Not yet implemented");
+    //return new SupervisedFeedForwardNeuralNetworkImpl2(getLayer(0), getLayer(1));
   }
   
   @Override

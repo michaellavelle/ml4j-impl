@@ -4,7 +4,7 @@
 	<groupId>org.ml4j</groupId>
 	<artifactId>ml4j-layers-impl</artifactId>
 	<packaging>jar</packaging>
-	<version>1.0.0-SNAPSHOT</version>
+	<version>2.0.0-SNAPSHOT</version>
 	<name>ml4j-layers-impl</name>
 	<properties>
 	</properties>
@@ -23,12 +23,12 @@
 		<dependency>
 			<groupId>org.ml4j</groupId>
 			<artifactId>ml4j-layers-api</artifactId>
-			<version>1.0.0</version>
+			<version>2.0.0-SNAPSHOT</version>
 		</dependency>
 		<dependency>
 			<groupId>org.ml4j</groupId>
 			<artifactId>ml4j-synapses-impl</artifactId>
-			<version>1.0.0-SNAPSHOT</version>
+			<version>2.0.0-SNAPSHOT</version>
 		</dependency>
 	</dependencies>
 	<build>
@@ -41,6 +41,7 @@
 					<target>1.8</target>
 				</configuration>
 			</plugin>
+			<!-- 
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-checkstyle-plugin</artifactId>
@@ -64,10 +65,12 @@
 					</execution>
 				</executions>
 			</plugin>
+			 -->
 		</plugins>
 	</build>
 	<reporting>
 		<plugins>
+		    <!-- 
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-javadoc-plugin</artifactId>
@@ -85,6 +88,7 @@
 					</reportSet>
 				</reportSets>
 			</plugin>
+			 -->
 		</plugins>
 	</reporting>
 </project>

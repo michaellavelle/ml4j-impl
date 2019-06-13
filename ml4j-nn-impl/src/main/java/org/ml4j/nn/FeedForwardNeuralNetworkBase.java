@@ -14,8 +14,10 @@
 
 package org.ml4j.nn;
 
+import java.util.Collections;
+import java.util.List;
+
 import org.ml4j.Matrix;
-import org.ml4j.MatrixFactory;
 import org.ml4j.nn.activationfunctions.DifferentiableActivationFunction;
 import org.ml4j.nn.activationfunctions.LinearActivationFunction;
 import org.ml4j.nn.activationfunctions.SigmoidActivationFunction;
@@ -23,41 +25,36 @@ import org.ml4j.nn.activationfunctions.SoftmaxActivationFunction;
 import org.ml4j.nn.axons.AxonsGradient;
 import org.ml4j.nn.axons.ConnectionWeightsAdjustmentDirection;
 import org.ml4j.nn.axons.TrainableAxons;
+import org.ml4j.nn.components.DirectedComponentChain;
+import org.ml4j.nn.components.TrailingActivationFunctionDirectedComponentChain;
+import org.ml4j.nn.components.TrailingActivationFunctionDirectedComponentChainActivation;
+import org.ml4j.nn.components.TrailingActivationFunctionDirectedComponentChainImpl;
 import org.ml4j.nn.costfunctions.CostFunction;
 import org.ml4j.nn.costfunctions.CostFunctionGradient;
 import org.ml4j.nn.costfunctions.CrossEntropyCostFunction;
 import org.ml4j.nn.costfunctions.DeltaRuleCostFunctionGradientImpl;
 import org.ml4j.nn.costfunctions.MultiClassCrossEntropyCostFunction;
 import org.ml4j.nn.costfunctions.SumSquaredErrorCostFunction;
-import org.ml4j.nn.layers.DirectedLayerActivation;
-import org.ml4j.nn.layers.DirectedLayerGradient;
-import org.ml4j.nn.layers.FeedForwardLayer;
 import org.ml4j.nn.neurons.NeuronsActivation;
 import org.ml4j.nn.optimisation.GradientDescentOptimisationStrategy;
 import org.ml4j.nn.optimisation.TrainingLearningRateAdjustmentStrategy;
-import org.ml4j.nn.synapses.DirectedSynapses;
-import org.ml4j.nn.synapses.DirectedSynapsesGradient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
 
 /**
  * Default base implementation of a FeedForwardNeuralNetwork.
  *
  * @author Michael Lavelle
  */
-public abstract class FeedForwardNeuralNetworkBase<C extends FeedForwardNeuralNetworkContext, 
+public abstract class FeedForwardNeuralNetworkBase<C extends FeedForwardNeuralNetworkContext, H extends DirectedComponentChain<NeuronsActivation, ?, ?, ?>,
     N extends FeedForwardNeuralNetwork<C,N>> 
     implements FeedForwardNeuralNetwork<C, N> {
 
   private static final Logger LOGGER = 
       LoggerFactory.getLogger(FeedForwardNeuralNetworkBase.class);
   
-  private List<FeedForwardLayer<?, ?>> layers;
+  protected H initialisingComponentChain;
+  private TrailingActivationFunctionDirectedComponentChain<?> trailingActivationFunctionComponentChain;
   
   private C lastEpochTrainingContext;
     
@@ -71,11 +68,11 @@ public abstract class FeedForwardNeuralNetworkBase<C extends FeedForwardNeuralNe
    * 
    * @param layers The layers
    */
-  public FeedForwardNeuralNetworkBase(FeedForwardLayer<?, ?>... layers) {
-    this.layers = new ArrayList<FeedForwardLayer<?, ?>>();
-    this.layers.addAll(Arrays.asList(layers));
+  public FeedForwardNeuralNetworkBase(H initialisingComponentChain) {
+	this.initialisingComponentChain = initialisingComponentChain;
+    this.trailingActivationFunctionComponentChain = new TrailingActivationFunctionDirectedComponentChainImpl(initialisingComponentChain.getComponents());
   }
-
+ 
   protected void train(NeuronsActivation trainingDataActivations,
       NeuronsActivation trainingLabelActivations, C trainingContext) {
 
@@ -149,7 +146,7 @@ public abstract class FeedForwardNeuralNetworkBase<C extends FeedForwardNeuralNe
   protected CostAndGradientsImpl getCostAndGradients(NeuronsActivation inputActivations,
       NeuronsActivation desiredOutputActivations, C trainingContext) {
        
-    final CostFunction costFunction = getCostFunction(trainingContext.getMatrixFactory());
+    final CostFunction costFunction = getCostFunction();
     
     // Forward propagate the trainingDataActivations through the entire Network
     ForwardPropagation forwardPropagation =
@@ -165,22 +162,7 @@ public abstract class FeedForwardNeuralNetworkBase<C extends FeedForwardNeuralNe
 
     // Obtain the gradients of each set of Axons we wish to train - for this example it is
     // all the Axons
-    List<AxonsGradient> totalTrainableAxonsGradients = new ArrayList<>();
-    List<DirectedLayerGradient> reversed = new ArrayList<>();
-    reversed.addAll(backPropagation.getDirectedLayerGradients());
-    Collections.reverse(reversed);
-
-    for (DirectedLayerGradient gradient : reversed) {
-      for (DirectedSynapsesGradient synapsesGradient : gradient.getSynapsesGradients()) {
-        
-        AxonsGradient totalTrainableAxonsGradient 
-            = synapsesGradient.getTotalTrainableAxonsGradient();
-        
-        if (totalTrainableAxonsGradient != null) {
-          totalTrainableAxonsGradients.add(totalTrainableAxonsGradient);
-        }
-      }
-    }
+    List<AxonsGradient> totalTrainableAxonsGradients = backPropagation.getGradient().getTotalTrainableAxonsGradients();
 
     // Obtain the cost from the cost function
     LOGGER.debug("Calculating total cost function cost");
@@ -248,74 +230,48 @@ public abstract class FeedForwardNeuralNetworkBase<C extends FeedForwardNeuralNe
       axonsIndex++;
     }
   }
-
-  @Override
-  public List<FeedForwardLayer<?, ?>> getLayers() {
-    return layers;
+  
+  /*
+  protected DirectedLayerChain<FeedForwardLayer<?, ?>> createLayerChain(FeedForwardNeuralNetworkContext context, int startLayerIndex, int endLayerIndex) {
+	  return new DirectedLayerChainImpl<>(getLayers().subList(context.getStartLayerIndex(), endLayerIndex + 1));
   }
-
-  @Override
-  public int getNumberOfLayers() {
-    return layers.size();
-  }
-
-  @Override
-  public FeedForwardLayer<?, ?> getLayer(int layerIndex) {
-    return layers.get(layerIndex);
-  }
-
-  @Override
-  public FeedForwardLayer<?, ?> getFirstLayer() {
-    return layers.get(0);
-  }
-
-  @Override
-  public FeedForwardLayer<?, ?> getFinalLayer() {
-    return layers.get(getNumberOfLayers() - 1);
-
-  }
+  */
 
   @Override
   public ForwardPropagation forwardPropagate(NeuronsActivation inputActivation,
       FeedForwardNeuralNetworkContext context) {
-    
-    int endLayerIndex =
-        context.getEndLayerIndex() == null ? (getNumberOfLayers() - 1) : context.getEndLayerIndex();
-
-    LOGGER.debug("Forward propagating through FeedForwardNeuralNetwork from layerIndex:"
-        + context.getStartLayerIndex() + " to layerIndex:" + endLayerIndex);
+	
+	//int endLayerIndex =
+	//	        context.getEndLayerIndex() == null ? (getNumberOfLayers() - 1) : context.getEndLayerIndex();  
+	  
+	//LOGGER.debug("Forward propagating through FeedForwardNeuralNetwork from layerIndex:"
+	//	        + context.getStartLayerIndex() + " to layerIndex:" + endLayerIndex);  
+	 	
+	
+	// Create the chain of layers
+    //DirectedLayerChain<FeedForwardLayer<?, ?>> layerChain = createLayerChain(context, context.getStartLayerIndex(), endLayerIndex);
         
-    NeuronsActivation inFlightActivations = inputActivation;
-    int layerIndex = 0;
-    List<DirectedLayerActivation> activations = new ArrayList<>();
-    for (FeedForwardLayer<?, ?> layer : getLayers()) {
-
-      if (layerIndex >= context.getStartLayerIndex() && layerIndex <= endLayerIndex) {
-
-        DirectedLayerActivation inFlightLayerActivations = 
-            layer.forwardPropagate(inFlightActivations, context.getLayerContext(layerIndex));
-        activations.add(inFlightLayerActivations);
-        inFlightActivations = inFlightLayerActivations.getOutput();
-      }
-      layerIndex++;
-    }
+    // Forward propagate through the layers
+	TrailingActivationFunctionDirectedComponentChainActivation activation = trailingActivationFunctionComponentChain.forwardPropagate(inputActivation, context.getDirectedComponentsContext());
     
+    // Construct a forward propagation
     ForwardPropagation forwardPropagation 
-        = new ForwardPropagationImpl(activations, inFlightActivations);
+        = new ForwardPropagationImpl(activation);
+    /*
     if (context.getForwardPropagationListener() != null) {
       context.getForwardPropagationListener().onForwardPropagation(forwardPropagation);
     }
+    */
     return forwardPropagation;
   }
   
   /**
    * @return The default cost function for use by this Network.
    */
-  protected CostFunction getCostFunction(MatrixFactory matrixFactory) {
-
-    List<DirectedSynapses<?, ?>> synapseList = getFinalLayer().getSynapses();
-    DirectedSynapses<?, ?> finalSynapses = synapseList.get(synapseList.size() - 1);
-    DifferentiableActivationFunction activationFunction = finalSynapses.getActivationFunction();
+  protected CostFunction getCostFunction() {
+	  
+	  DifferentiableActivationFunction activationFunction = trailingActivationFunctionComponentChain.getFinalComponent().getActivationFunction();
+	  
     if (activationFunction == null) {
       throw new UnsupportedOperationException(
           "Default cost function not yet defined for null activation function");

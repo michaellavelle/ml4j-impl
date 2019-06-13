@@ -1,10 +1,11 @@
 package org.ml4j.nn.activationfunctions;
 
 import org.ml4j.Matrix;
+import org.ml4j.nn.components.DirectedComponentGradient;
+import org.ml4j.nn.components.DirectedComponentGradientImpl;
 import org.ml4j.nn.costfunctions.CostFunctionGradient;
 import org.ml4j.nn.neurons.NeuronsActivation;
-import org.ml4j.nn.synapses.DirectedSynapsesContext;
-import org.ml4j.nn.synapses.DirectedSynapsesGradient;
+import org.ml4j.nn.neurons.NeuronsActivationContext;
 
 public class DifferentiableActivationFunctionActivationImpl
     implements DifferentiableActivationFunctionActivation {
@@ -12,6 +13,7 @@ public class DifferentiableActivationFunctionActivationImpl
   private NeuronsActivation input;
   private NeuronsActivation output;
   private DifferentiableActivationFunction activationFunction;
+  private NeuronsActivationContext neuronsActivationContext;
 
   /**
    * @param activationFunction The activation function that generated this activation.
@@ -20,10 +22,11 @@ public class DifferentiableActivationFunctionActivationImpl
    */
   public DifferentiableActivationFunctionActivationImpl(
       DifferentiableActivationFunction activationFunction, NeuronsActivation input,
-      NeuronsActivation output) {
+      NeuronsActivation output, NeuronsActivationContext neuronsActivationContext) {
     this.input = input;
     this.output = output;
     this.activationFunction = activationFunction;
+    this.neuronsActivationContext = neuronsActivationContext;
   }
 
   @Override
@@ -37,23 +40,20 @@ public class DifferentiableActivationFunctionActivationImpl
   }
 
   @Override
-  public ActivationFunctionGradient backPropagate(DirectedSynapsesGradient da,
-      DirectedSynapsesContext context) {
+  public DirectedComponentGradient<NeuronsActivation> backPropagate(DirectedComponentGradient<NeuronsActivation> da) {
 
     Matrix dz = null;
 
     Matrix activationGradient =
-        activationFunction.activationGradient(this, context).getActivations().transpose();
-
+        activationFunction.activationGradient(this, neuronsActivationContext).getActivations().transpose();
     dz = da.getOutput().getActivations().mul(activationGradient);
 
-    return new ActivationFunctionGradientImpl((new NeuronsActivation(dz, 
+    return new DirectedComponentGradientImpl<>((new NeuronsActivation(dz, 
         da.getOutput().getFeatureOrientation())));
   }
 
   @Override
-  public ActivationFunctionGradient backPropagate(CostFunctionGradient da, 
-      DirectedSynapsesContext context) {
+  public DirectedComponentGradient<NeuronsActivation> backPropagate(CostFunctionGradient da) {
     return da.backPropagateThroughFinalActivationFunction(activationFunction);
   }
 

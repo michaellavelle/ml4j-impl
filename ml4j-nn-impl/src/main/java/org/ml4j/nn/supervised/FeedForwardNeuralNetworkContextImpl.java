@@ -18,13 +18,10 @@ import org.ml4j.MatrixFactory;
 import org.ml4j.nn.BackPropagationListener;
 import org.ml4j.nn.FeedForwardNeuralNetworkContext;
 import org.ml4j.nn.ForwardPropagationListener;
-import org.ml4j.nn.layers.DirectedLayerContext;
-import org.ml4j.nn.layers.DirectedLayerContextImpl;
+import org.ml4j.nn.components.DirectedComponentsContext;
+import org.ml4j.nn.components.DirectedComponentsContextImpl;
 import org.ml4j.nn.optimisation.GradientDescentOptimisationStrategy;
 import org.ml4j.nn.optimisation.TrainingLearningRateAdjustmentStrategy;
-
-import java.util.HashMap;
-import java.util.Map;
 
 /**
  * Simple default implementation of FeedForwardNeuralNetworkContext.
@@ -44,9 +41,11 @@ public class FeedForwardNeuralNetworkContextImpl implements FeedForwardNeuralNet
    */
   private MatrixFactory matrixFactory;
 
-  private int startLayerIndex;
+  //private int startLayerIndex;
 
-  private Integer endLayerIndex;
+  //private Integer endLayerIndex;
+  
+  private DirectedComponentsContext directedComponentsContext;
 
   private Integer trainingEpochs;
 
@@ -56,7 +55,7 @@ public class FeedForwardNeuralNetworkContextImpl implements FeedForwardNeuralNet
 
   private Integer lastTrainingEpochIndex;
 
-  private Map<Integer, DirectedLayerContext> directedLayerContexts;
+  //private Map<Integer, DirectedLayerContext> directedLayerContexts;
 
   private GradientDescentOptimisationStrategy gradientDescentOptimisationStrategy;
 
@@ -71,16 +70,9 @@ public class FeedForwardNeuralNetworkContextImpl implements FeedForwardNeuralNet
    * 
    * @param matrixFactory The MatrixFactory we configure for this context
    */
-  public FeedForwardNeuralNetworkContextImpl(MatrixFactory matrixFactory, int startLayerIndex,
-      Integer endLayerIndex) {
+  public FeedForwardNeuralNetworkContextImpl(MatrixFactory matrixFactory) {
     this.matrixFactory = matrixFactory;
-    this.startLayerIndex = startLayerIndex;
-    this.endLayerIndex = endLayerIndex;
-    if (endLayerIndex != null && startLayerIndex > endLayerIndex) {
-      throw new IllegalArgumentException(
-          "Start layer index cannot be greater " + "than end layer index");
-    }
-    this.directedLayerContexts = new HashMap<>();
+    this.directedComponentsContext = new DirectedComponentsContextImpl(matrixFactory);
   }
 
   @Override
@@ -88,6 +80,7 @@ public class FeedForwardNeuralNetworkContextImpl implements FeedForwardNeuralNet
     return matrixFactory;
   }
 
+  /*
   @Override
   public DirectedLayerContext getLayerContext(int layerIndex) {
 
@@ -99,7 +92,9 @@ public class FeedForwardNeuralNetworkContextImpl implements FeedForwardNeuralNet
 
     return layerContext;
   }
+  */
 
+  /*
   @Override
   public int getStartLayerIndex() {
     return startLayerIndex;
@@ -109,6 +104,7 @@ public class FeedForwardNeuralNetworkContextImpl implements FeedForwardNeuralNet
   public Integer getEndLayerIndex() {
     return endLayerIndex;
   }
+  */
 
   @Override
   public int getTrainingEpochs() {
@@ -197,5 +193,10 @@ public class FeedForwardNeuralNetworkContextImpl implements FeedForwardNeuralNet
   @Override
   public void setForwardPropagationListener(ForwardPropagationListener forwardPropagationListener) {
     this.forwardPropagationListener = forwardPropagationListener;
+  }
+
+  @Override
+  public DirectedComponentsContext getDirectedComponentsContext() {
+	return this.directedComponentsContext;
   }
 }

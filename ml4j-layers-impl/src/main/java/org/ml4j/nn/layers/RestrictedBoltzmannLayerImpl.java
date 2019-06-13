@@ -31,6 +31,7 @@ import org.ml4j.nn.synapses.UndirectedSynapsesInputImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
@@ -105,7 +106,6 @@ public class RestrictedBoltzmannLayerImpl implements RestrictedBoltzmannLayer<Fu
     return axons;
   }
 
-  @Override
   public List<UndirectedSynapses<?, ?>> getSynapses() {
     return Arrays.asList(synapses);
   }
@@ -291,5 +291,12 @@ public class RestrictedBoltzmannLayerImpl implements RestrictedBoltzmannLayer<Fu
     }
     return props;
   }
+
+@Override
+public List<UndirectedSynapses<?, ?>> getComponents() {
+	List<UndirectedSynapses<?, ?>> components = new ArrayList<>();
+	components.addAll(getSynapses());
+	return components;
+}
 
 }

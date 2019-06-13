@@ -14,8 +14,13 @@
 
 package org.ml4j.nn.unsupervised;
 
+import java.util.Arrays;
+import java.util.List;
+
 import org.ml4j.nn.CostAndGradientsImpl;
-import org.ml4j.nn.FeedForwardNeuralNetworkBase;
+import org.ml4j.nn.LayeredFeedForwardNeuralNetworkBase;
+import org.ml4j.nn.layers.DirectedLayerChain;
+import org.ml4j.nn.layers.DirectedLayerChainImpl;
 import org.ml4j.nn.layers.FeedForwardLayer;
 import org.ml4j.nn.neurons.NeuronsActivation;
 import org.slf4j.Logger;
@@ -27,7 +32,7 @@ import org.slf4j.LoggerFactory;
  * @author Michael Lavelle
  */
 public class AutoEncoderImpl extends 
-    FeedForwardNeuralNetworkBase<AutoEncoderContext, AutoEncoder> implements AutoEncoder {
+    LayeredFeedForwardNeuralNetworkBase<AutoEncoderContext, AutoEncoder> implements AutoEncoder {
 
   /**
    * Default serialization id.
@@ -44,7 +49,7 @@ public class AutoEncoderImpl extends
    */
   public AutoEncoderImpl(FeedForwardLayer<?, ?> encodingLayer,
       FeedForwardLayer<?, ?> decodingLayer) {
-      super(encodingLayer, decodingLayer);
+      this(new DirectedLayerChainImpl<>(Arrays.asList(encodingLayer, decodingLayer)));
   }
   
   /**
@@ -52,20 +57,25 @@ public class AutoEncoderImpl extends
    * 
    * @param layers The layers
    */
-  public AutoEncoderImpl(FeedForwardLayer<?, ?>... layers) {
-      super(layers);
+  public AutoEncoderImpl(List<FeedForwardLayer<?, ?>> layers) {
+      this(new DirectedLayerChainImpl<>(layers));
+  }
+  
+  protected AutoEncoderImpl(DirectedLayerChain<FeedForwardLayer<?, ?>> initialisingComponentChain) {
+	super(initialisingComponentChain);
   }
 
   @Override
   public AutoEncoder dup() {
-    return new AutoEncoderImpl(getLayer(0), getLayer(1));
+    return new AutoEncoderImpl(this.initialisingComponentChain);
   }
+  
 
   @Override
   public NeuronsActivation encode(NeuronsActivation unencoded, AutoEncoderContext context) {
     LOGGER.debug("Encoding through AutoEncoder");
     if (context.getEndLayerIndex() == null
-        || context.getEndLayerIndex() >= (this.getNumberOfLayers() - 1)) {
+        || context.getEndLayerIndex() >= (getNumberOfLayers() - 1)) {
       throw new IllegalArgumentException("End layer index for encoding through AutoEncoder "
           + " must be specified and must not be the index of the last layer");
     }

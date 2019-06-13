@@ -29,9 +29,6 @@ import org.ml4j.nn.neurons.NeuronsActivationWithPossibleBiasUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.Arrays;
-import java.util.List;
-
 public class RestrictedBoltzmannMachineImpl implements RestrictedBoltzmannMachine {
 
   private static final Logger LOGGER =
@@ -81,6 +78,7 @@ public class RestrictedBoltzmannMachineImpl implements RestrictedBoltzmannMachin
     return new RestrictedBoltzmannMachineImpl(restrictedBoltzmannLayer.dup());
   }
 
+  /*
   @Override
   public RestrictedBoltzmannLayer<FullyConnectedAxons> getFinalLayer() {
     return restrictedBoltzmannLayer;
@@ -100,16 +98,20 @@ public class RestrictedBoltzmannMachineImpl implements RestrictedBoltzmannMachin
           "RestrictedBoltzmannMachines have only a single Layer available at index 0");
     }
   }
+ 
 
   @Override
   public List<RestrictedBoltzmannLayer<FullyConnectedAxons>> getLayers() {
     return Arrays.asList(restrictedBoltzmannLayer);
   }
 
+ 
   @Override
   public int getNumberOfLayers() {
     return 1;
   }
+
+	*/
 
   @Override
   public void train(NeuronsActivation trainingActivations,
@@ -189,8 +191,8 @@ public class RestrictedBoltzmannMachineImpl implements RestrictedBoltzmannMachin
       // Push the visible data to the hidden neurons
 
       RestrictedBoltzmannLayerActivation hiddenNeuronsDataActivation =
-          getFirstLayer().activateHiddenNeuronsFromVisibleNeuronsData(visibleActivations,
-              trainingContext.getLayerContext(0));
+          restrictedBoltzmannLayer.activateHiddenNeuronsFromVisibleNeuronsData(visibleActivations,
+              trainingContext.getLayerContext());
 
       if (firstHiddenNeuronsDataActivation == null) {
         firstHiddenNeuronsDataActivation = hiddenNeuronsDataActivation;
@@ -199,8 +201,8 @@ public class RestrictedBoltzmannMachineImpl implements RestrictedBoltzmannMachin
       // Push a hidden neuron sample to the visible neurons to get a reconstruction
 
       RestrictedBoltzmannLayerActivation visibleNeuronsReconstructionLayerActivation =
-          getFirstLayer().activateVisibleNeuronsFromHiddenNeuronsSample(
-              firstHiddenNeuronsDataActivation, trainingContext.getLayerContext(0));
+    		  restrictedBoltzmannLayer.activateVisibleNeuronsFromHiddenNeuronsSample(
+              firstHiddenNeuronsDataActivation, trainingContext.getLayerContext());
 
       lastVisibleNeuronsReconstructionLayerActivation = visibleNeuronsReconstructionLayerActivation;
 
@@ -218,15 +220,15 @@ public class RestrictedBoltzmannMachineImpl implements RestrictedBoltzmannMachin
         lastVisibleNeuronsReconstructionLayerActivation.getVisibleActivationProbablities();
 
     RestrictedBoltzmannLayerActivation contrastiveDivergenceActivation =
-        getFirstLayer().activateHiddenNeuronsFromVisibleNeuronsReconstruction(
-            lastVisibleNeuronsReconstructionLayerActivation, trainingContext.getLayerContext(0));
+    		restrictedBoltzmannLayer.activateHiddenNeuronsFromVisibleNeuronsReconstruction(
+            lastVisibleNeuronsReconstructionLayerActivation, trainingContext.getLayerContext());
 
     // Calculate the statistics and the weight adjustment
     Matrix adjustment = getWeightsAdjustment(firstHiddenNeuronsDataActivation,
         firstVisibleNeuronsReconstructionLayerActivation, contrastiveDivergenceActivation,
         trainingContext);
 
-    getFirstLayer().getPrimaryAxons().adjustConnectionWeights(adjustment,
+    restrictedBoltzmannLayer.getPrimaryAxons().adjustConnectionWeights(adjustment,
         ConnectionWeightsAdjustmentDirection.ADDITION);
 
     return lastReconstructions;
@@ -251,7 +253,7 @@ public class RestrictedBoltzmannMachineImpl implements RestrictedBoltzmannMachin
     NeuronsActivationWithPossibleBiasUnit hiddenAxonsDataActivations =
         new NeuronsActivationWithPossibleBiasUnit(
             hiddenAxonsDataActivationsTransposed.getActivations().transpose(),
-            getFirstLayer().getHiddenNeurons().hasBiasUnit(),
+            restrictedBoltzmannLayer.getHiddenNeurons().hasBiasUnit(),
             NeuronsActivationFeatureOrientation.COLUMNS_SPAN_FEATURE_SET, false);
 
     Matrix positiveStatistics = getContrastiveDivergenceStatistics(visibleAxonsDataActivations,
@@ -357,8 +359,8 @@ public class RestrictedBoltzmannMachineImpl implements RestrictedBoltzmannMachin
       // Push the visible data to the hidden neurons
 
       RestrictedBoltzmannLayerActivation hiddenNeuronsDataActivation =
-          getFirstLayer().activateHiddenNeuronsFromVisibleNeuronsData(visibleActivations,
-              context.getLayerContext(0));
+    		  restrictedBoltzmannLayer.activateHiddenNeuronsFromVisibleNeuronsData(visibleActivations,
+              context.getLayerContext());
 
       if (firstHiddenNeuronsDataActivation == null) {
         firstHiddenNeuronsDataActivation = hiddenNeuronsDataActivation;
@@ -367,8 +369,8 @@ public class RestrictedBoltzmannMachineImpl implements RestrictedBoltzmannMachin
       // Push a hidden neuron sample to the visible neurons to get a reconstruction
 
       RestrictedBoltzmannLayerActivation visibleNeuronsReconstructionLayerActivation =
-          getFirstLayer().activateVisibleNeuronsFromHiddenNeuronsSample(
-              firstHiddenNeuronsDataActivation, context.getLayerContext(0));
+    		  restrictedBoltzmannLayer.activateVisibleNeuronsFromHiddenNeuronsSample(
+              firstHiddenNeuronsDataActivation, context.getLayerContext());
 
       lastVisibleNeuronsReconstructionLayerActivation = visibleNeuronsReconstructionLayerActivation;
 
@@ -397,7 +399,7 @@ public class RestrictedBoltzmannMachineImpl implements RestrictedBoltzmannMachin
   public NeuronsActivation decodeToBinary(NeuronsActivation hiddenUnitActivatons,
       RestrictedBoltzmannMachineContext context) {
     return restrictedBoltzmannLayer
-        .activateVisibleNeuronsFromHiddenNeurons(hiddenUnitActivatons, context.getLayerContext(0))
+        .activateVisibleNeuronsFromHiddenNeurons(hiddenUnitActivatons, context.getLayerContext())
         .getVisibleActivationBinarySample(context.getMatrixFactory());
   }
 
@@ -405,7 +407,7 @@ public class RestrictedBoltzmannMachineImpl implements RestrictedBoltzmannMachin
   public NeuronsActivation decodeToProbabilities(NeuronsActivation hiddenUnitActivatons,
       RestrictedBoltzmannMachineContext context) {
     return restrictedBoltzmannLayer
-        .activateVisibleNeuronsFromHiddenNeurons(hiddenUnitActivatons, context.getLayerContext(0))
+        .activateVisibleNeuronsFromHiddenNeurons(hiddenUnitActivatons, context.getLayerContext())
         .getVisibleActivationProbablities();
   }
 
@@ -414,7 +416,12 @@ public class RestrictedBoltzmannMachineImpl implements RestrictedBoltzmannMachin
       RestrictedBoltzmannMachineContext context) {
     return restrictedBoltzmannLayer
         .activateHiddenNeuronsFromVisibleNeuronsData(
-            visibleUnitActivations, context.getLayerContext(0))
+            visibleUnitActivations, context.getLayerContext())
         .getHiddenActivationBinarySample(context.getMatrixFactory());
   }
+
+@Override
+public RestrictedBoltzmannLayer<FullyConnectedAxons> getLayer() {
+	return restrictedBoltzmannLayer;
+}
 }

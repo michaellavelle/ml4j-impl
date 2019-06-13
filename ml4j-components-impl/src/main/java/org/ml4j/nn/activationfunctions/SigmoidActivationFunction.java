@@ -17,7 +17,6 @@ package org.ml4j.nn.activationfunctions;
 import org.ml4j.Matrix;
 import org.ml4j.nn.neurons.NeuronsActivation;
 import org.ml4j.nn.neurons.NeuronsActivationContext;
-import org.ml4j.nn.util.NeuralNetUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -27,33 +26,49 @@ import org.slf4j.LoggerFactory;
  * @author Michael Lavelle
  *
  */
-public class SoftmaxActivationFunction implements DifferentiableActivationFunction {
-
+public class SigmoidActivationFunction implements DifferentiableActivationFunction {
+  
   /**
    * Default serialization id.
    */
   private static final long serialVersionUID = 1L;
   
-  private static final Logger LOGGER = LoggerFactory.getLogger(SoftmaxActivationFunction.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(SigmoidActivationFunction.class);
 
   @Override
   public DifferentiableActivationFunctionActivation activate(NeuronsActivation input, 
       NeuronsActivationContext context) {
-    LOGGER.debug("Activating through SoftmaxActivationFunction");
-   
-    Matrix softmaxOfInputActivationsMatrix = NeuralNetUtils
-        .softmax(input.getActivations());
+    LOGGER.debug("Activating through SigmoidActivationFunction");
+
+    Matrix sigmoidOfInputActivationsMatrix = 
+        input.getActivations().sigmoid();
     return new DifferentiableActivationFunctionActivationImpl(this, input, 
-        new NeuronsActivation(softmaxOfInputActivationsMatrix,
-        input.getFeatureOrientation()));
+        new NeuronsActivation(sigmoidOfInputActivationsMatrix,
+        input.getFeatureOrientation()), context);
   }
 
   @Override
   public NeuronsActivation activationGradient(DifferentiableActivationFunctionActivation 
-      outputActivation,
+      activationFunctionActivation,
       NeuronsActivationContext context) {
-    throw new UnsupportedOperationException("Standalone activation gradient of "
-        + "softmax not supported - gradient calculation is performed in combination with a "
-        + "specified cost function at the outer layer");
+    
+    LOGGER.debug("Performing sigmoid gradient of NeuronsActivation");
+  
+    Matrix sigmoidOfActivationInput = null;
+    if (activationFunctionActivation instanceof SigmoidActivationFunction) {
+      sigmoidOfActivationInput = activationFunctionActivation.getOutput()
+          .getActivations();
+    } else {
+      Matrix activationInput = activationFunctionActivation.getInput().getActivations();
+      sigmoidOfActivationInput = activationInput.sigmoid();
+    }
+ 
+    Matrix gradientAtActivationInput = 
+        sigmoidOfActivationInput.subi(sigmoidOfActivationInput.mul(sigmoidOfActivationInput));
+   
+    return new NeuronsActivation(
+        gradientAtActivationInput, 
+        activationFunctionActivation.getInput().getFeatureOrientation());
+
   }
 }

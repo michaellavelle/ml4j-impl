@@ -6,6 +6,7 @@
         <version>1.0</version>
         <packaging>pom</packaging>
 	<modules>
+		<module>ml4j-components-impl</module>
 		<module>ml4j-matrices-impl</module>
 		<module>ml4j-synapses-impl</module>
 		<module>ml4j-layers-impl</module>

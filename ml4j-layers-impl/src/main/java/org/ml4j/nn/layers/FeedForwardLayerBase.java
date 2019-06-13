@@ -16,28 +16,35 @@
 
 package org.ml4j.nn.layers;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Collectors;
+
 import org.ml4j.Matrix;
 import org.ml4j.MatrixFactory;
 import org.ml4j.nn.activationfunctions.DifferentiableActivationFunction;
 import org.ml4j.nn.activationfunctions.LinearActivationFunction;
 import org.ml4j.nn.axons.Axons;
-import org.ml4j.nn.axons.ScaleAndShiftAxonsAlternateImpl;
 import org.ml4j.nn.axons.ScaleAndShiftAxonsConfig;
+import org.ml4j.nn.axons.ScaleAndShiftAxonsImpl;
+import org.ml4j.nn.components.ChainableDirectedComponent;
+import org.ml4j.nn.components.ChainableDirectedComponentActivation;
+import org.ml4j.nn.components.DirectedComponentsContext;
+import org.ml4j.nn.components.DirectedComponentsContextImpl;
+import org.ml4j.nn.components.TrailingActivationFunctionDirectedComponentChain;
+import org.ml4j.nn.components.TrailingActivationFunctionDirectedComponentChainActivation;
+import org.ml4j.nn.components.TrailingActivationFunctionDirectedComponentChainImpl;
 import org.ml4j.nn.neurons.Neurons;
 import org.ml4j.nn.neurons.NeuronsActivation;
 import org.ml4j.nn.neurons.NeuronsActivationFeatureOrientation;
 import org.ml4j.nn.synapses.BatchNormDirectedSynapses;
 import org.ml4j.nn.synapses.BatchNormDirectedSynapsesImpl;
 import org.ml4j.nn.synapses.DirectedSynapses;
-import org.ml4j.nn.synapses.DirectedSynapsesActivation;
+import org.ml4j.nn.synapses.DirectedSynapsesChain;
+import org.ml4j.nn.synapses.DirectedSynapsesChainImpl;
 import org.ml4j.nn.synapses.DirectedSynapsesImpl;
-import org.ml4j.nn.synapses.DirectedSynapsesInput;
-import org.ml4j.nn.synapses.DirectedSynapsesInputImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * A default base implementation of FeedForwardLayer.
@@ -46,11 +53,11 @@ import java.util.List;
  * 
  * @param <A> The type of primary Axons in this FeedForwardLayer.
  */
-public abstract class FeedForwardLayerBase<A extends Axons<?, ?, ?>, 
-    L extends FeedForwardLayer<A, L>> 
+public abstract class FeedForwardLayerBase<A extends Axons<?, ?, ?>,
+    L extends FeedForwardLayer<A, L>> extends AbstractFeedForwardLayer<A, L>
     implements FeedForwardLayer<A, L> {
 
-  /**
+/**
    * Default serialization id.
    */
   private static final long serialVersionUID = 1L;
@@ -61,13 +68,9 @@ public abstract class FeedForwardLayerBase<A extends Axons<?, ?, ?>,
   protected A primaryAxons;
   
   protected DifferentiableActivationFunction primaryActivationFunction;
-  
-  protected MatrixFactory matrixFactory;
-  
+    
   protected boolean withBatchNorm;
-  
-  protected BatchNormDirectedSynapses<?, ?> batchNormSynapses;
- 
+   
   /**
    * @param primaryAxons The primary Axons
    * @param activationFunction The primary activation function
@@ -77,25 +80,11 @@ public abstract class FeedForwardLayerBase<A extends Axons<?, ?, ?>,
   protected FeedForwardLayerBase(A primaryAxons, 
       DifferentiableActivationFunction activationFunction, MatrixFactory matrixFactory, 
       boolean withBatchNorm) {
+	  super(new DirectedSynapsesChainImpl<>(getSynapses(matrixFactory, primaryAxons, activationFunction, withBatchNorm)), matrixFactory);
     this.primaryAxons = primaryAxons;
     this.primaryActivationFunction = activationFunction;
     this.matrixFactory = matrixFactory;
     this.withBatchNorm = withBatchNorm;
-    if (withBatchNorm) {
-      
-      Matrix initialGamma = matrixFactory.createOnes(1, 
-          getPrimaryAxons().getRightNeurons().getNeuronCountExcludingBias());
-      Matrix initialBeta = matrixFactory.createZeros(1, 
-          getPrimaryAxons().getRightNeurons().getNeuronCountExcludingBias());
-      ScaleAndShiftAxonsConfig config = 
-          new ScaleAndShiftAxonsConfig(initialGamma, initialBeta);
-      
-      this.batchNormSynapses = new BatchNormDirectedSynapsesImpl<Neurons, Neurons>(
-          getPrimaryAxons().getRightNeurons(), getPrimaryAxons().getRightNeurons(),
-          new ScaleAndShiftAxonsAlternateImpl(
-              new Neurons(getPrimaryAxons().getRightNeurons().getNeuronCountExcludingBias(), true),
-              getPrimaryAxons().getRightNeurons(), matrixFactory, config), activationFunction);
-    }
   }
 
   @Override
@@ -112,12 +101,84 @@ public abstract class FeedForwardLayerBase<A extends Axons<?, ?, ?>,
   public A getPrimaryAxons() {
     return primaryAxons;
   }
+  
+  @Override
+  public DifferentiableActivationFunction getPrimaryActivationFunction() {
+    return primaryActivationFunction;
+  }
+  
+  protected static List<DirectedSynapses<?, ?>> getSynapses(MatrixFactory matrixFactory, Axons<?, ?, ?> primaryAxons, DifferentiableActivationFunction primaryActivationFunction, boolean withBatchNorm) {
+	    List<DirectedSynapses<?, ?>> synapses = new ArrayList<>();
+	    if (withBatchNorm) {
+	    	      
+	    	  Matrix initialGamma = matrixFactory.createOnes(1, 
+	    			  primaryAxons.getRightNeurons().getNeuronCountExcludingBias());
+	    	  Matrix initialBeta = matrixFactory.createZeros(1, 
+	    			  primaryAxons.getRightNeurons().getNeuronCountExcludingBias());
+	    	  ScaleAndShiftAxonsConfig config = 
+	    	          new ScaleAndShiftAxonsConfig(initialGamma, initialBeta);
+	    	      
+	    	  BatchNormDirectedSynapses<?, ?> batchNormSynapses = new BatchNormDirectedSynapsesImpl<Neurons, Neurons>(
+	    	    		  primaryAxons.getRightNeurons(), primaryAxons.getRightNeurons(),
+	    	          new ScaleAndShiftAxonsImpl(
+	    	              new Neurons(primaryAxons.getRightNeurons().getNeuronCountExcludingBias(), true),
+	    	              primaryAxons.getRightNeurons(), matrixFactory, config), primaryActivationFunction);
+	    	
+	    	
+	      synapses.add(new DirectedSynapsesImpl<Neurons, Neurons>(primaryAxons, 
+	          new LinearActivationFunction()));
+	      
+	      synapses.add(batchNormSynapses);
+	      
+	    } else {
+	      synapses.add(new DirectedSynapsesImpl<Neurons, Neurons>(
+	          primaryAxons, primaryActivationFunction));
+	    }
+	    return synapses;
+	  }
+	  
+	  @Override
+	  public List<ChainableDirectedComponent<NeuronsActivation, ?, ?>> getComponents() {
+		  List<ChainableDirectedComponent<NeuronsActivation, ?, ?>> components = new ArrayList<>();
+		  components.addAll(getSynapses(matrixFactory, primaryAxons, primaryActivationFunction, withBatchNorm));
+		  return components;
+	  }
+   
+	protected TrailingActivationFunctionDirectedComponentChain<?> createChain() {
+		DirectedSynapsesChain<DirectedSynapses<?, ?>> synapseChain = new DirectedSynapsesChainImpl<>(getSynapses(matrixFactory, primaryAxons, primaryActivationFunction, withBatchNorm));
+		List<ChainableDirectedComponent<NeuronsActivation, ? extends ChainableDirectedComponentActivation<NeuronsActivation>, ?>> chainableComponents = new ArrayList<>();
+		chainableComponents.addAll(synapseChain.decompose());
+		return new TrailingActivationFunctionDirectedComponentChainImpl(chainableComponents);
+	}
+	
+  
+  @Override
+  public DirectedLayerActivation forwardPropagate(NeuronsActivation inputNeuronsActivation,
+      DirectedLayerContext directedLayerContext) {
+    LOGGER.debug(directedLayerContext.toString() + ":Forward propagating through layer");
+    
+	DirectedComponentsContext componentsContext = new DirectedComponentsContextImpl(directedLayerContext.getMatrixFactory()); 
+
+    TrailingActivationFunctionDirectedComponentChainActivation activation = createChain().forwardPropagate(inputNeuronsActivation, componentsContext);
+    
+	return new DirectedLayerActivationImpl(this, activation, directedLayerContext);   
+  }
+  
+  @Override
+  public DirectedLayerContext getContext(DirectedComponentsContext directedComponentsContext, int componentIndex) {
+	  return directedComponentsContext.getContext(this, () -> new DirectedLayerContextImpl(componentIndex, matrixFactory));
+  }
+  
 
   @Override
+	public List<ChainableDirectedComponent<NeuronsActivation, ? extends ChainableDirectedComponentActivation<NeuronsActivation>, ?>> decompose() {
+	return getComponents().stream().flatMap(c -> c.decompose().stream()).collect((Collectors.toList()));
+  }
+
+@Override
   public NeuronsActivation getOptimalInputForOutputNeuron(int outputNeuronIndex,
       DirectedLayerContext directedLayerContext) {
     LOGGER.debug("Obtaining optimal input for output neuron with index:" + outputNeuronIndex);
-    //int countJ = getPrimaryAxons().getLeftNeurons().getNeuronCountExcludingBias();
     Matrix weights = getPrimaryAxons().getDetachedConnectionWeights();
     int countJ = weights.getRows() - (getPrimaryAxons().getLeftNeurons().hasBiasUnit() ? 1 : 0);
     double[] maximisingInputFeatures = new double[countJ];
@@ -148,48 +209,5 @@ public abstract class FeedForwardLayerBase<A extends Axons<?, ?, ?>,
   private double getWij(int indI, int indJ, Matrix weights, boolean hasBiasUnit) {
     int indICorrected = indI + (hasBiasUnit ? 1 : 0);
     return weights.get(indICorrected, indJ);
-  }
-
-  @Override
-  public DifferentiableActivationFunction getPrimaryActivationFunction() {
-    return primaryActivationFunction;
-  }
-
-  @Override
-  public DirectedLayerActivation forwardPropagate(NeuronsActivation inputNeuronsActivation,
-      DirectedLayerContext directedLayerContext) {
-    LOGGER.debug(directedLayerContext.toString() + ":Forward propagating through layer");
-    
-    NeuronsActivation inFlightNeuronsActivation = inputNeuronsActivation;
-    List<DirectedSynapsesActivation> synapseActivations = new ArrayList<>();
-    int synapsesIndex = 0;
-    for (DirectedSynapses<?, ?> synapses : getSynapses()) {
-      DirectedSynapsesInput input = new DirectedSynapsesInputImpl(inFlightNeuronsActivation);
-      DirectedSynapsesActivation inFlightNeuronsSynapseActivation = 
-          synapses.forwardPropagate(input, 
-              directedLayerContext.getSynapsesContext(synapsesIndex++));
-      synapseActivations.add(inFlightNeuronsSynapseActivation);
-      inFlightNeuronsActivation = inFlightNeuronsSynapseActivation.getOutput();
-    }
- 
-    return new DirectedLayerActivationImpl(this, synapseActivations, 
-        inFlightNeuronsActivation);
-  }
-
-  @Override
-  public List<DirectedSynapses<?, ?>> getSynapses() {
-    List<DirectedSynapses<?, ?>> synapses = new ArrayList<>();
-    if (withBatchNorm) {
- 
-      synapses.add(new DirectedSynapsesImpl<Neurons, Neurons>(getPrimaryAxons(), 
-          new LinearActivationFunction()));
-      
-      synapses.add(batchNormSynapses);
-      
-    } else {
-      synapses.add(new DirectedSynapsesImpl<Neurons, Neurons>(
-          getPrimaryAxons(), getPrimaryActivationFunction()));
-    }
-    return synapses;
   }
 }

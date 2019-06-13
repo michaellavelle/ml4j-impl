@@ -17,8 +17,7 @@
 package org.ml4j.nn.unsupervised;
 
 import org.ml4j.MatrixFactory;
-import org.ml4j.nn.supervised.FeedForwardNeuralNetworkContextImpl;
-import org.ml4j.nn.unsupervised.AutoEncoderContext;
+import org.ml4j.nn.supervised.LayeredFeedForwardNeuralNetworkContextImpl;
 
 /**
  * Simple default implementation of AutoEncoderContext.
@@ -27,7 +26,7 @@ import org.ml4j.nn.unsupervised.AutoEncoderContext;
  * 
  */
 public class AutoEncoderContextImpl 
-    extends FeedForwardNeuralNetworkContextImpl implements AutoEncoderContext {
+    extends LayeredFeedForwardNeuralNetworkContextImpl implements AutoEncoderContext {
 
   /**
    * Default serialization id.

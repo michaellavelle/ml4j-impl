@@ -16,12 +16,12 @@
 
 package org.ml4j.nn.synapses;
 
+import java.util.HashMap;
+import java.util.Map;
+
 import org.ml4j.MatrixFactory;
 import org.ml4j.nn.axons.AxonsContext;
 import org.ml4j.nn.axons.AxonsContextImpl;
-
-import java.util.HashMap;
-import java.util.Map;
 
 /**
  * Simple default implementation of DirectedSynapsesContext.
@@ -61,7 +61,7 @@ public class UndirectedSynapsesContextImpl implements UndirectedSynapsesContext 
   }
 
   @Override
-  public AxonsContext getAxonsContext(int axonsIndex) {
+  public AxonsContext getAxonsContext(int pathIndex, int axonsIndex) {
     
     AxonsContext axonsContext = axonsContextsByAxonsIndex.get(axonsIndex);
     if (axonsContext == null) {

@@ -17,12 +17,12 @@
 package org.ml4j.nn.costfunctions;
 
 import org.ml4j.Matrix;
-import org.ml4j.nn.activationfunctions.ActivationFunctionGradient;
-import org.ml4j.nn.activationfunctions.ActivationFunctionGradientImpl;
 import org.ml4j.nn.activationfunctions.DifferentiableActivationFunction;
 import org.ml4j.nn.activationfunctions.LinearActivationFunction;
 import org.ml4j.nn.activationfunctions.SigmoidActivationFunction;
 import org.ml4j.nn.activationfunctions.SoftmaxActivationFunction;
+import org.ml4j.nn.components.DirectedComponentGradient;
+import org.ml4j.nn.components.DirectedComponentGradientImpl;
 import org.ml4j.nn.neurons.NeuronsActivation;
 import org.ml4j.nn.neurons.NeuronsActivationFeatureOrientation;
 
@@ -68,7 +68,7 @@ public class DeltaRuleCostFunctionGradientImpl implements CostFunctionGradient {
   }
 
   @Override
-  public ActivationFunctionGradient backPropagateThroughFinalActivationFunction(
+  public DirectedComponentGradient<NeuronsActivation> backPropagateThroughFinalActivationFunction(
       DifferentiableActivationFunction finalActivationFunction) {
 
     if (!isDeltaRuleSupported(finalActivationFunction)) {
@@ -90,7 +90,7 @@ public class DeltaRuleCostFunctionGradientImpl implements CostFunctionGradient {
     NeuronsActivation deltas = new NeuronsActivation(deltasM.transpose(),
         NeuronsActivationFeatureOrientation.ROWS_SPAN_FEATURE_SET);
 
-    return new ActivationFunctionGradientImpl(deltas);
+    return new DirectedComponentGradientImpl<>(deltas);
 
   }
 
